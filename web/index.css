@@ -754,3 +754,117 @@ button:hover{background:rgba(255,255,255,0.02)}
 	border-color: var(--accent);
 	background: rgba(79,70,229,0.1);
 }
+
+
+/* Styles pour les tâches dans les slots */
+.slot-tasks {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.slot-task {
+  font-size: 10px;
+  font-weight: 500;
+  color: white;
+  padding: 2px 4px;
+  border-radius: 3px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Ajuster le contenu principal du slot pour faire de la place aux tâches */
+.slot .title,
+.slot .time {
+  margin-right: 70px; /* Faire de la place pour les tâches */
+}
+
+/* Responsive : réduire l'espace sur mobile */
+@media (max-width: 420px) {
+  .slot-tasks {
+    width: 50px;
+  }
+  
+  .slot .title,
+  .slot .time {
+    margin-right: 60px;
+  }
+  
+  .slot-task {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
+}
+
+
+
+/* Section des tâches assignées dans le menu du slot */
+.assigned-tasks-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.assigned-tasks-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.assigned-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assigned-task-item {
+  background-color: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-left: 3px solid var(--accent);
+}
+
+.assigned-task-item:hover {
+  background-color: rgba(255,255,255,0.08);
+}
+
+.assigned-task-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #e6eef8;
+  margin-bottom: 2px;
+}
+
+.assigned-task-info {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+/* Responsive pour les tâches assignées */
+@media (max-width: 420px) {
+  .assigned-task-item {
+    padding: 6px 10px;
+  }
+  
+  .assigned-task-name {
+    font-size: 12px;
+  }
+  
+  .assigned-task-info {
+    font-size: 10px;
+  }
+}
