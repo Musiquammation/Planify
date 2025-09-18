@@ -186,6 +186,7 @@ function deleteTask(){
 }
 
 // Update floating button visibility
+// Remplacer cette fonction :
 function updateFloatingButtonVisibility(){
   const anyMenuOpen = taskPanel.classList.contains('open') || 
                      taskEditor.classList.contains('open') || 
@@ -214,10 +215,11 @@ function renderGrid(){
     el.style.top=(slot.start/60*hourHeight+6)+'px';
     el.style.height=Math.max(28,(slot.end-slot.start)/60*hourHeight-6)+'px';
     el.style.left='6px'; el.style.right='6px';
-    el.innerHTML=`<div class="title">Créneau</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
+    el.innerHTML=`<div class="title">${slot.name || "Créneau"}</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
 
+    // Dans renderGrid(), remplacer l'event listener onclick :
     el.onclick = (ev) => {
-      if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open')) return;
+      if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return; // Ajouter settingsPanel.classList.contains('open')
       ev.stopPropagation();
       openSlotMenu(slot);
     };
@@ -228,7 +230,7 @@ function renderGrid(){
 
 // Open slot menu
 function openSlotMenu(slot){
-  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open')) return;
+  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return; // Ajouter settingsPanel.classList.contains('open')
   
   currentEditingSlot = slot;
   
@@ -243,12 +245,17 @@ function openSlotMenu(slot){
   updateSlotInfo(slot);
   renderTaskTypeGrid(slot.taskPreferences);
   slotMenu.classList.add('open');
+  updateFloatingButtonVisibility(); // Ajouter cette ligne
 }
 
 function updateSlotInfo(slot) {
   const duration = slot.end - slot.start;
   
   slotInfo.innerHTML = `
+    <div class="slot-info-row">
+      <span class="slot-info-label">Nom:</span>
+      <input type="text" class="editable-time" id="slotNameInput" value="${slot.name || 'Créneau'}" style="min-width: 120px; text-align: left;">
+    </div>
     <div class="slot-info-row">
       <span class="slot-info-label">Heure début:</span>
       <input type="text" class="editable-time" id="startTimeInput" value="${minutesToTime(slot.start)}">
@@ -263,7 +270,25 @@ function updateSlotInfo(slot) {
     </div>
   `;
   
-  // Ajouter les événements pour les champs d'heure
+  // Ajouter les événements pour le nom
+  const slotNameInput = document.getElementById('slotNameInput');
+  
+  function updateSlotName() {
+    const newName = slotNameInput.value.trim();
+    if (newName) {
+      slot.name = newName;
+      renderGrid(); // Re-rendre pour mettre à jour l'affichage
+    }
+  }
+  
+  slotNameInput.addEventListener('blur', updateSlotName);
+  slotNameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur();
+    }
+  });
+  
+  // Événements existants pour les heures...
   const startTimeInput = document.getElementById('startTimeInput');
   const endTimeInput = document.getElementById('endTimeInput');
   
@@ -275,14 +300,11 @@ function updateSlotInfo(slot) {
       slot.start = startMinutes;
       slot.end = endMinutes;
       
-      // Mettre à jour l'affichage de la durée
       const newDuration = slot.end - slot.start;
       document.querySelector('.duration-display').textContent = formatDuration(newDuration);
       
-      // Re-rendre la grille pour refléter les changements
       renderGrid();
     } else {
-      // Restaurer les valeurs valides si l'entrée est invalide
       startTimeInput.value = minutesToTime(slot.start);
       endTimeInput.value = minutesToTime(slot.end);
     }
@@ -303,7 +325,11 @@ function updateSlotInfo(slot) {
   });
 }
 
-function closeSideMenu(){ slotMenu.classList.remove('open'); }
+// Remplacer cette fonction :
+function closeSideMenu(){ 
+  slotMenu.classList.remove('open'); 
+  updateFloatingButtonVisibility(); // Ajouter cette ligne
+}
 
 // Open task panel
 function openTaskPanel(){
@@ -363,7 +389,9 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 function startDrag(e){
   if(e.type==='mousedown' && e.button!==0) return;
-  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open')) return;
+  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return; // Ajouter settingsPanel.classList.contains('open')
+
+  isDragging=true;
   isDragging=true;
   hasMoved=false;
   const y=pageYFromEvt(e), top=clientRectTop(slotLayer);
@@ -421,8 +449,9 @@ function endDrag(e){
   }
 
   function addSlot(slot){
-    // Initialiser les préférences de tâches
+    // Initialiser les préférences de tâches ET le nom
     slot.taskPreferences = {};
+    slot.name = slot.name || "Créneau"; // Ajouter cette ligne
     taskTypes.forEach(type => {
       slot.taskPreferences[type.name] = 0.5;
     });
@@ -432,10 +461,11 @@ function endDrag(e){
     store[key].push(slot);
     renderGrid();
 
+
     const slotEls = slotLayer.getElementsByClassName('slot');
     const newSlotEl = slotEls[slotEls.length-1];
     newSlotEl.onclick = (ev) => {
-      if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open')) return;
+      if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
       ev.stopPropagation();
       openSlotMenu(slot);
     };
@@ -455,7 +485,7 @@ function endDrag(e){
     return;
   }
 
-  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open')){
+  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')){ // Ajouter settingsPanel.classList.contains('open')
     if(selectionEl){ selectionEl.remove(); selectionEl = null; }
     return;
   }
@@ -766,6 +796,11 @@ document.addEventListener('click', e => {
     closeTaskPanelFunc();
     e.stopPropagation();
   }
+  
+  if (settingsPanel.classList.contains('open') && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+    closeSettingsPanelFunc();
+    e.stopPropagation();
+  }
 });
 
 
@@ -792,13 +827,6 @@ closeSettingsPanel.addEventListener('click', e => {
 
 addTypeBtn.addEventListener('click', addNewTaskType);
 
-// Close settings panel on outside click
-document.addEventListener('click', e => {
-  if (settingsPanel.classList.contains('open') && !settingsPanel.contains(e.target) && e.target !== settingsBtn) {
-    closeSettingsPanelFunc();
-    e.stopPropagation();
-  }
-});
 
 
 
