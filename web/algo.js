@@ -1,0 +1,3 @@
+function runAlgo(store, tasks) {
+	
+}
