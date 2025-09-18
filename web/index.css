@@ -386,6 +386,7 @@ button:hover{background:rgba(255,255,255,0.02)}
   background: rgba(255,255,255,0.1);
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 .task-type-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -620,6 +621,7 @@ button:hover{background:rgba(255,255,255,0.02)}
   align-items: center;
   gap: 12px;
   border-left: 4px solid;
+  min-width: 0; /* Permet aux éléments flexibles de se réduire si nécessaire */
 }
 
 .task-type-item input[type="text"] {
@@ -631,6 +633,7 @@ button:hover{background:rgba(255,255,255,0.02)}
   flex: 1;
   outline: none;
   padding: 4px;
+  min-width: 0; /* Permet à l'input de se réduire si nécessaire */
 }
 
 .task-type-item input[type="text"]:focus {
@@ -647,7 +650,9 @@ button:hover{background:rgba(255,255,255,0.02)}
   outline: none;
   background: transparent;
   padding: 0;
+  flex-shrink: 0; /* Empêche la réduction du color picker */
 }
+
 
 .color-picker::-webkit-color-swatch-wrapper {
   padding: 0;
