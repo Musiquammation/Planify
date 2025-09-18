@@ -551,10 +551,11 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 function startDrag(e){
   if(e.type==='mousedown' && e.button!==0) return;
-  if(isDraggingSlot) return; // Ajouter cette ligne
+  if(isDraggingSlot) return;
   if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
 
-  isDragging=true;
+  if(e.target.closest('.slot')) return; // Ne pas créer de nouveau slot si on clique sur un slot existant
+
   isDragging=true;
   hasMoved=false;
   const y=pageYFromEvt(e), top=clientRectTop(slotLayer);
@@ -694,95 +695,70 @@ function startSlotDrag(e, slot, element) {
   if (slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
   
   e.stopPropagation();
+  e.preventDefault(); // AJOUTER pour empêcher autres événements
   
-  let hasMovedForDrag = false;
-  let dragTimer = null;
+  let hasMoved = false;
   const startX = e.touches ? e.touches[0].clientX : e.clientX;
   const startY = e.touches ? e.touches[0].clientY : e.clientY;
   
   const rect = element.getBoundingClientRect();
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  
   slotDragOffset = {
-    x: clientX - rect.left,
-    y: clientY - rect.top
+    x: (e.touches ? e.touches[0].clientX : e.clientX) - rect.left,
+    y: (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
   };
-  
-  // Sur PC, attendre un délai avant de commencer le drag
-  if (!e.touches) {
-    dragTimer = setTimeout(() => {
-      if (!hasMovedForDrag) {
-        hasMovedForDrag = true;
-        isDraggingSlot = true;
-        draggedSlot = slot;
-        draggedSlotElement = element;
-        element.style.cursor = 'grabbing';
-      }
-    }, 150); // 150ms de délai pour distinguer clic/drag sur PC
-  }
   
   function onMove(moveEvent) {
     const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
     const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
     const distance = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
     
-    // Sur mobile (touch), commencer le drag dès qu'on bouge
-    if (moveEvent.touches && distance > 5 && !hasMovedForDrag) {
-      if (dragTimer) clearTimeout(dragTimer);
-      hasMovedForDrag = true;
+    if (distance > 5 && !hasMoved) {
+      hasMoved = true;
       isDraggingSlot = true;
       draggedSlot = slot;
       draggedSlotElement = element;
       element.style.cursor = 'grabbing';
+      moveEvent.preventDefault();
     }
     
-    // Sur PC, commencer le drag seulement après le timer OU si mouvement important
-    if (!moveEvent.touches && distance > 10 && !hasMovedForDrag) {
-      if (dragTimer) clearTimeout(dragTimer);
-      hasMovedForDrag = true;
-      isDraggingSlot = true;
-      draggedSlot = slot;
-      draggedSlotElement = element;
-      element.style.cursor = 'grabbing';
-    }
-    
-    if (hasMovedForDrag) {
+    if (hasMoved) {
       moveEvent.preventDefault();
       onSlotDrag(moveEvent);
     }
   }
   
   function onEnd(endEvent) {
-    if (dragTimer) clearTimeout(dragTimer);
-    
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onEnd);
     window.removeEventListener('touchmove', onMove);
     window.removeEventListener('touchend', onEnd);
     
-    if (hasMovedForDrag) {
+    if (hasMoved) {
       endSlotDrag(endEvent);
     } else {
       // Clic simple - ouvrir le menu
-      if (!slotMenu.classList.contains('open') && !taskPanel.classList.contains('open') && !taskEditor.classList.contains('open') && !settingsPanel.classList.contains('open')) {
-        openSlotMenu(slot);
-      }
+      setTimeout(() => {
+        if (!slotMenu.classList.contains('open') && !taskPanel.classList.contains('open') && !taskEditor.classList.contains('open') && !settingsPanel.classList.contains('open')) {
+          openSlotMenu(slot);
+        }
+      }, 10); // Petit délai pour éviter les conflits
     }
     
     element.style.cursor = 'pointer';
+    isDraggingSlot = false; // AJOUTER pour nettoyer
+    draggedSlot = null;
+    draggedSlotElement = null;
   }
   
-  // Ne pas empêcher le comportement par défaut immédiatement sur PC
-  if (e.touches) {
-    e.preventDefault();
-  }
-  
-  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mousemove', onMove, {passive: false});
   window.addEventListener('mouseup', onEnd);
   window.addEventListener('touchmove', onMove, {passive: false});
   window.addEventListener('touchend', onEnd);
 }
+
+
+
+
 
 // Modifier la fonction onSlotDrag pour mettre à jour les heures en temps réel :
 function onSlotDrag(e) {
