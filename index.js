@@ -32,6 +32,8 @@ const closeSettingsPanel = document.getElementById('closeSettingsPanel');
 const taskTypesList = document.getElementById('taskTypesList');
 const addTypeBtn = document.getElementById('addTypeBtn');
 
+const completions = new Map();
+
 let viewDate = new Date();
 viewDate.setHours(0,0,0,0);
 const store = {};
@@ -243,12 +245,11 @@ function updateFloatingButtonVisibility(){
 }
 
 // Render grid
+// À la fin de la fonction renderGrid(), ajouter :
 function renderGrid(){
   slotLayer.innerHTML='';
   const key=isoDateKey(viewDate);
   const daySlots=store[key]||[];
-  // Remplacer la création des slots dans renderGrid() :
-  // Dans renderGrid(), remplacer la création des slots :
   daySlots.forEach(slot=>{
     const el=document.createElement('div');
     el.className='slot';
@@ -262,7 +263,7 @@ function renderGrid(){
     // Appliquer la couleur basée sur les préférences
     const slotColor = getSlotColor(slot);
     el.style.borderLeftColor = slotColor;
-    el.style.background = `linear-gradient(90deg, ${slotColor}16, ${slotColor}08)`; // 16 et 08 en hex = 22% et 8% d'opacité
+    el.style.background = `linear-gradient(90deg, ${slotColor}16, ${slotColor}08)`;
     
     el.innerHTML=`<div class="title">${slot.name || "Créneau"}</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
 
@@ -272,6 +273,9 @@ function renderGrid(){
 
     slotLayer.appendChild(el);
   });
+  
+  // Appeler showCompletions après avoir créé tous les slots
+  showCompletions();
 }
 
 // Open slot menu
@@ -304,6 +308,30 @@ function formatDateForInput(d) {
 function updateSlotInfo(slot) {
   const duration = slot.end - slot.start;
   
+  // Récupérer les tâches assignées à ce slot
+  const assignedTasks = completions.get(slot) || [];
+  
+  let tasksHtml = '';
+  if (assignedTasks.length > 0) {
+    tasksHtml = `
+      <div class="assigned-tasks-section">
+        <h4>Tâches assignées</h4>
+        <div class="assigned-tasks-list">
+          ${assignedTasks.map((task, index) => {
+            const taskTypeObj = taskTypes.find(t => t.name === task.type);
+            const taskColor = taskTypeObj ? taskTypeObj.color : '#4f46e5';
+            return `
+              <div class="assigned-task-item" data-task-index="${tasks.indexOf(task)}" style="border-left-color: ${taskColor}">
+                <div class="assigned-task-name">${task.name}</div>
+                <div class="assigned-task-info">${task.type} • ${task.duration}min</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
   slotInfo.innerHTML = `
     <div class="slot-info-row">
       <span class="slot-info-label">Nom:</span>
@@ -325,9 +353,25 @@ function updateSlotInfo(slot) {
       <span class="slot-info-label">Durée:</span>
       <span class="duration-display">${formatDuration(duration)}</span>
     </div>
+    ${tasksHtml}
   `;
   
-  // Événements pour le nom (inchangés)
+  // Ajouter les événements de clic sur les tâches assignées
+  const assignedTaskItems = document.querySelectorAll('.assigned-task-item');
+  assignedTaskItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const taskIndex = parseInt(item.dataset.taskIndex);
+      if (taskIndex >= 0 && taskIndex < tasks.length) {
+        // Fermer le menu du slot et ouvrir l'éditeur de tâche
+        closeSideMenu();
+        setTimeout(() => {
+          openTaskEditor(taskIndex);
+        }, 100);
+      }
+    });
+  });
+  
+  // Événements existants pour le nom
   const slotNameInput = document.getElementById('slotNameInput');
   
   function updateSlotName() {
@@ -356,12 +400,12 @@ function updateSlotInfo(slot) {
     if (isNaN(newDate.getTime())) return;
     
     moveSlotToNewDateTime(slot, newDate, slot.start);
-    closeSideMenu(); // Fermer le menu après déplacement
+    closeSideMenu();
   }
   
   slotDateInput.addEventListener('change', updateSlotDate);
   
-  // Événements pour les heures (inchangés)
+  // Événements pour les heures
   const startTimeInput = document.getElementById('startTimeInput');
   const endTimeInput = document.getElementById('endTimeInput');
   
@@ -398,7 +442,7 @@ function updateSlotInfo(slot) {
   });
 }
 
-// Remplacer cette fonction :
+
 function closeSideMenu(){ 
   slotMenu.classList.remove('open'); 
   updateFloatingButtonVisibility(); // Ajouter cette ligne
@@ -423,6 +467,51 @@ function openDay(d){
   renderGrid();
 }
 
+
+// Ajouter cette fonction après les autres fonctions utilitaires :
+function showCompletions() {
+  // Parcourir tous les slots actuellement affichés
+  const slotElements = document.querySelectorAll('.slot');
+  
+  slotElements.forEach(slotElement => {
+    // Retrouver le slot object correspondant via les data attributes
+    const start = parseInt(slotElement.dataset.start);
+    const end = parseInt(slotElement.dataset.end);
+    
+    // Trouver le slot object dans le store
+    const key = isoDateKey(viewDate);
+    const daySlots = store[key] || [];
+    const slot = daySlots.find(s => s.start === start && s.end === end);
+    
+    if (slot && completions.has(slot)) {
+      const assignedTasks = completions.get(slot);
+      
+      // Créer ou mettre à jour la zone des tâches
+      let tasksContainer = slotElement.querySelector('.slot-tasks');
+      if (!tasksContainer) {
+        tasksContainer = document.createElement('div');
+        tasksContainer.className = 'slot-tasks';
+        slotElement.appendChild(tasksContainer);
+      }
+      
+      // Vider et remplir avec les nouvelles tâches
+      tasksContainer.innerHTML = '';
+      assignedTasks.forEach(task => {
+        const taskElement = document.createElement('div');
+        taskElement.className = 'slot-task';
+        taskElement.textContent = task.name;
+        
+        // Trouver la couleur du type de tâche
+        const taskTypeObj = taskTypes.find(t => t.name === task.type);
+        if (taskTypeObj) {
+          taskElement.style.backgroundColor = taskTypeObj.color;
+        }
+        
+        tasksContainer.appendChild(taskElement);
+      });
+    }
+  });
+}
 // Event listeners
 closeMenu.addEventListener('click', e=>{ e.stopPropagation(); closeSideMenu(); });
 prevBtn.addEventListener('click',()=>{ const d=new Date(viewDate); d.setDate(d.getDate()-1); openDay(d); });
@@ -600,18 +689,14 @@ function endDrag(e){
   if(selectionEl){ selectionEl.remove(); selectionEl = null; }
 }
 
-
-// Ajouter ces nouvelles fonctions après la fonction endDrag() :
-
-// Modifier la fonction startSlotDrag pour détecter le mouvement :
 function startSlotDrag(e, slot, element) {
   if (e.type === 'mousedown' && e.button !== 0) return;
   if (slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
   
   e.stopPropagation();
-  e.preventDefault();
   
-  let hasMovedForDrag = false; // Ajouter cette variable
+  let hasMovedForDrag = false;
+  let dragTimer = null;
   const startX = e.touches ? e.touches[0].clientX : e.clientX;
   const startY = e.touches ? e.touches[0].clientY : e.clientY;
   
@@ -624,27 +709,53 @@ function startSlotDrag(e, slot, element) {
     y: clientY - rect.top
   };
   
+  // Sur PC, attendre un délai avant de commencer le drag
+  if (!e.touches) {
+    dragTimer = setTimeout(() => {
+      if (!hasMovedForDrag) {
+        hasMovedForDrag = true;
+        isDraggingSlot = true;
+        draggedSlot = slot;
+        draggedSlotElement = element;
+        element.style.cursor = 'grabbing';
+      }
+    }, 150); // 150ms de délai pour distinguer clic/drag sur PC
+  }
+  
   function onMove(moveEvent) {
     const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
     const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
     const distance = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
     
-    if (distance > 5 && !hasMovedForDrag) { // Seuil de 5px pour commencer le drag
+    // Sur mobile (touch), commencer le drag dès qu'on bouge
+    if (moveEvent.touches && distance > 5 && !hasMovedForDrag) {
+      if (dragTimer) clearTimeout(dragTimer);
       hasMovedForDrag = true;
       isDraggingSlot = true;
       draggedSlot = slot;
       draggedSlotElement = element;
-      
-      // Pas d'effets visuels bizarres, juste le curseur
+      element.style.cursor = 'grabbing';
+    }
+    
+    // Sur PC, commencer le drag seulement après le timer OU si mouvement important
+    if (!moveEvent.touches && distance > 10 && !hasMovedForDrag) {
+      if (dragTimer) clearTimeout(dragTimer);
+      hasMovedForDrag = true;
+      isDraggingSlot = true;
+      draggedSlot = slot;
+      draggedSlotElement = element;
       element.style.cursor = 'grabbing';
     }
     
     if (hasMovedForDrag) {
+      moveEvent.preventDefault();
       onSlotDrag(moveEvent);
     }
   }
   
   function onEnd(endEvent) {
+    if (dragTimer) clearTimeout(dragTimer);
+    
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onEnd);
     window.removeEventListener('touchmove', onMove);
@@ -660,6 +771,11 @@ function startSlotDrag(e, slot, element) {
     }
     
     element.style.cursor = 'pointer';
+  }
+  
+  // Ne pas empêcher le comportement par défaut immédiatement sur PC
+  if (e.touches) {
+    e.preventDefault();
   }
   
   window.addEventListener('mousemove', onMove);
@@ -1090,8 +1206,137 @@ addTypeBtn.addEventListener('click', addNewTaskType);
 
 
 
-
-
+// Ajouter cette fonction pour tester le système de completions
+function initTest() {
+  // Créer beaucoup de tâches de test si elles n'existent pas déjà
+  if (tasks.length === 0) {
+    const testTasks = [
+      // Maths
+      { name: "Algèbre", duration: 30, type: "Maths" },
+      { name: "Géométrie", duration: 45, type: "Maths" },
+      { name: "Équations", duration: 25, type: "Maths" },
+      { name: "Fractions", duration: 35, type: "Maths" },
+      { name: "Calculs", duration: 20, type: "Maths" },
+      
+      // Français
+      { name: "Lecture", duration: 45, type: "Français" },
+      { name: "Dictée", duration: 20, type: "Français" },
+      { name: "Grammaire", duration: 30, type: "Français" },
+      { name: "Rédaction", duration: 60, type: "Français" },
+      { name: "Conjugaison", duration: 25, type: "Français" },
+      { name: "Orthographe", duration: 15, type: "Français" },
+      
+      // Histoire
+      { name: "Révolutions", duration: 40, type: "Histoire" },
+      { name: "Moyen Âge", duration: 35, type: "Histoire" },
+      { name: "Antiquité", duration: 45, type: "Histoire" },
+      { name: "Dates clés", duration: 20, type: "Histoire" },
+      
+      // Sciences
+      { name: "Physique", duration: 50, type: "Sciences" },
+      { name: "Chimie", duration: 40, type: "Sciences" },
+      { name: "Biologie", duration: 45, type: "Sciences" },
+      { name: "Expériences", duration: 60, type: "Sciences" },
+      { name: "Formules", duration: 25, type: "Sciences" },
+      
+      // Sport
+      { name: "Course", duration: 30, type: "Sport" },
+      { name: "Étirements", duration: 15, type: "Sport" },
+      { name: "Musculation", duration: 45, type: "Sport" },
+      { name: "Cardio", duration: 25, type: "Sport" },
+      
+      // Musique
+      { name: "Piano", duration: 30, type: "Musique" },
+      { name: "Solfège", duration: 25, type: "Musique" },
+      { name: "Chant", duration: 20, type: "Musique" },
+      
+      // Art
+      { name: "Dessin", duration: 40, type: "Art" },
+      { name: "Peinture", duration: 60, type: "Art" },
+      { name: "Sculpture", duration: 50, type: "Art" },
+      
+      // Pause
+      { name: "Pause café", duration: 15, type: "Pause" },
+      { name: "Détente", duration: 20, type: "Pause" },
+      { name: "Méditation", duration: 10, type: "Pause" }
+    ];
+    
+    tasks.push(...testTasks);
+    renderTaskList();
+  }
+  
+  // Créer quelques créneaux de test pour aujourd'hui
+  const key = isoDateKey(viewDate);
+  if (!store[key]) store[key] = [];
+  
+  // Ajouter des créneaux de test s'ils n'existent pas
+  if (store[key].length === 0) {
+    const slot1 = {
+      start: 9 * 60, // 9h00
+      end: 12 * 60, // 12h00 - Slot de 3h pour tester beaucoup de tâches
+      name: "Session Intensive",
+      taskPreferences: {
+        "Maths": 0.8,
+        "Français": 0.7,
+        "Histoire": 0.6,
+        "Sciences": 0.9,
+        "Sport": 0.2,
+        "Musique": 0.3,
+        "Art": 0.4,
+        "Pause": 0.5
+      }
+    };
+    
+    const slot2 = {
+      start: 14 * 60, // 14h00
+      end: 16 * 60, // 16h00
+      name: "Session Après-midi",
+      taskPreferences: {
+        "Maths": 0.2,
+        "Français": 0.7,
+        "Histoire": 0.9,
+        "Sciences": 0.4,
+        "Sport": 0.3,
+        "Musique": 0.6,
+        "Art": 0.8,
+        "Pause": 0.2
+      }
+    };
+    
+    const slot3 = {
+      start: 17 * 60, // 17h00
+      end: 18 * 60 + 30, // 18h30
+      name: "Session Sport",
+      taskPreferences: {
+        "Maths": 0.1,
+        "Français": 0.1,
+        "Histoire": 0.1,
+        "Sciences": 0.2,
+        "Sport": 0.9,
+        "Musique": 0.3,
+        "Art": 0.2,
+        "Pause": 0.4
+      }
+    };
+    
+    store[key].push(slot1, slot2, slot3);
+    
+    // BLINDER le premier slot avec beaucoup de tâches
+    completions.set(slot1, [
+      tasks[0],  // Algèbre
+      tasks[1],  // Géométrie
+      tasks[2],  // Équations
+      tasks[5],  // Lecture
+      tasks[6],  // Dictée
+    ]);
+    
+    // Assigner quelques tâches aux autres slots
+    completions.set(slot2, [tasks[8], tasks[13], tasks[28]]); // Rédaction + Antiquité + Peinture
+    completions.set(slot3, [tasks[20], tasks[21], tasks[22], tasks[32]]); // Course + Étirements + Musculation + Méditation
+    
+    renderGrid();
+  }
+}
 
 
 
@@ -1103,6 +1348,7 @@ addTypeBtn.addEventListener('click', addNewTaskType);
 
 
 // Initialize
+initTest();
 initTaskTypes();
 initTimes();
 renderTaskList();
