@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Vue Journalière - Exemple</title>
   <link rel="stylesheet" href="index.css">
-    
-  </style>
 </head>
 <body>
   <div class="app">
@@ -27,55 +25,78 @@
       </div>
     </div>
 
-
     <div class="hint">Clique ou fais glisser sur la grille pour créer un créneau.</div>
   </div>
 
-  <div class="side-menu" id="sideMenu">
-    <button class="close-btn" id="closeMenu">×</button>
-    <h2>Détails du créneau</h2>
+  <!-- Slot menu -->
+<div class="side-menu" id="sideMenu">
+  <button class="close-btn" id="closeMenu">×</button>
+  <h2>Détails du créneau</h2>
+  <div class="side-menu-content">
     <div id="slotInfo"></div>
+    <div class="task-type-grid" id="taskTypeGrid">
+      <h3>Préférences des types de tâches</h3>
+    </div>
+  </div>
+  <div class="side-menu-footer">
+    <button class="btn-primary" id="saveSlotBtn">Sauvegarder</button>
+  </div>
+</div>
+
+  <!-- Task panel -->
+  <div class="task-panel" id="taskPanel">
+    <button class="close-btn" id="closeTaskPanel">×</button>
+    <h2>Gestion des tâches</h2>
+    <div class="task-list" id="taskList"></div>
+    <button class="add-task-btn" id="addTaskBtn">Créer une tâche</button>
+  </div>
+
+  <!-- Task editor -->
+  <div class="task-editor" id="taskEditor">
+    <div class="task-editor-header">
+      <h2 id="taskEditorTitle">Nouvelle tâche</h2>
+      <button class="close-btn" id="closeTaskEditor">×</button>
+    </div>
+    <div class="task-editor-form">
+      <div class="form-group">
+        <label for="taskName">Nom de la tâche</label>
+        <input type="text" id="taskName" placeholder="Entrez le nom de la tâche">
+      </div>
+      <div class="form-group">
+        <label for="taskDuration">Durée (minutes)</label>
+        <input type="number" id="taskDuration" placeholder="60" min="15" step="15">
+      </div>
+      <div class="form-group">
+        <label for="taskType">Type</label>
+        <select id="taskType"></select>
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" id="cancelTaskBtn">Annuler</button>
+        <button class="btn-danger" id="deleteTaskBtn" style="display:none;">Supprimer</button>
+        <button class="btn-primary" id="saveTaskBtn">Sauvegarder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <button class="close-btn" id="closeSettingsPanel">×</button>
+    <h2>Paramètres</h2>
+    <div class="settings-content">
+      <div class="settings-section">
+        <h3>Types de tâches</h3>
+        <div class="task-type-list" id="taskTypesList"></div>
+        <button class="add-type-btn" id="addTypeBtn">Ajouter un type</button>
+      </div>
+    </div>
   </div>
 
   <!-- Floating button -->
-<button id="openTaskPannelBtn" style="
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    border-radius: 50%;
-    width: 56px;
-    height: 56px;
-    background-color: var(--accent);
-    color: white;
-    font-size: 24px;
-    border: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    z-index: 100;
-">+</button>
+  <button class="floating-btn" id="openTaskPannelBtn">+</button>
 
-<!-- New task panel -->
-<div id="taskPanel" style="
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100%;
-    width: 80%;
-    max-width: 300px;
-    background: var(--panel);
-    box-shadow: -4px 0 12px rgba(0,0,0,0.4);
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-">
-    <button id="closeTaskPanel" style="align-self:flex-end;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
-    <h2>New Task</h2>
-    <div id="taskPanelContent">
-        <!-- Task info goes here -->
-    </div>
-</div>
+  <!-- Settings button -->
+  <button class="settings-btn" id="settingsBtn">⚙️</button>
+
 
 
   <script src="index.js"></script>
