@@ -39,6 +39,13 @@ const tasks = [];
 let editingTaskIndex = -1;
 let currentEditingSlot = null;
 
+
+// Ajouter après les variables existantes :
+let isDraggingSlot = false;
+let draggedSlot = null;
+let draggedSlotElement = null;
+let slotDragOffset = { x: 0, y: 0 };
+
 // Task types
 const taskTypes = [
   {name: "Maths", color: "#3b82f6"},
@@ -51,7 +58,14 @@ const taskTypes = [
   {name: "Pause", color: "#6b7280"}
 ];
 
-function isoDateKey(d){ return d.toISOString().slice(0,10); }
+function isoDateKey(d){ 
+  // Utiliser les valeurs locales au lieu d'UTC pour éviter les décalages de fuseau horaire
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function minutesToTime(min){ const h=Math.floor(min/60), m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
 
 function formatDuration(minutes) {
@@ -65,6 +79,32 @@ function formatDuration(minutes) {
   } else {
     return `${hours}h${mins.toString().padStart(2, '0')}`;
   }
+}
+
+// Ajouter cette fonction après les fonctions utilitaires existantes :
+function getSlotColor(slot) {
+  if (!slot.taskPreferences) return '#4f46e5'; // Couleur par défaut (accent)
+  
+  let maxScore = 0;
+  let dominantType = null;
+  
+  // Trouver le type avec le score le plus élevé
+  Object.keys(slot.taskPreferences).forEach(typeName => {
+    const score = slot.taskPreferences[typeName];
+    if (score > maxScore) {
+      maxScore = score;
+      dominantType = typeName;
+    }
+  });
+  
+  // Si aucun type n'est majoritaire (> 0.5) ou si le score max est 0, couleur par défaut
+  if (!dominantType || maxScore <= 0.5) {
+    return '#4f46e5'; // Couleur par défaut (accent)
+  }
+  
+  // Trouver la couleur du type dominant
+  const typeObj = taskTypes.find(type => type.name === dominantType);
+  return typeObj ? typeObj.color : '#4f46e5';
 }
 
 function parseTimeInput(timeStr) {
@@ -207,6 +247,8 @@ function renderGrid(){
   slotLayer.innerHTML='';
   const key=isoDateKey(viewDate);
   const daySlots=store[key]||[];
+  // Remplacer la création des slots dans renderGrid() :
+  // Dans renderGrid(), remplacer la création des slots :
   daySlots.forEach(slot=>{
     const el=document.createElement('div');
     el.className='slot';
@@ -215,14 +257,18 @@ function renderGrid(){
     el.style.top=(slot.start/60*hourHeight+6)+'px';
     el.style.height=Math.max(28,(slot.end-slot.start)/60*hourHeight-6)+'px';
     el.style.left='6px'; el.style.right='6px';
+    el.style.cursor='pointer';
+    
+    // Appliquer la couleur basée sur les préférences
+    const slotColor = getSlotColor(slot);
+    el.style.borderLeftColor = slotColor;
+    el.style.background = `linear-gradient(90deg, ${slotColor}16, ${slotColor}08)`; // 16 et 08 en hex = 22% et 8% d'opacité
+    
     el.innerHTML=`<div class="title">${slot.name || "Créneau"}</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
 
-    // Dans renderGrid(), remplacer l'event listener onclick :
-    el.onclick = (ev) => {
-      if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return; // Ajouter settingsPanel.classList.contains('open')
-      ev.stopPropagation();
-      openSlotMenu(slot);
-    };
+    // Événements de drag
+    el.addEventListener('mousedown', (e) => startSlotDrag(e, slot, el));
+    el.addEventListener('touchstart', (e) => startSlotDrag(e, slot, el), {passive: false});
 
     slotLayer.appendChild(el);
   });
@@ -248,13 +294,24 @@ function openSlotMenu(slot){
   updateFloatingButtonVisibility(); // Ajouter cette ligne
 }
 
+function formatDateForInput(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function updateSlotInfo(slot) {
   const duration = slot.end - slot.start;
   
   slotInfo.innerHTML = `
     <div class="slot-info-row">
       <span class="slot-info-label">Nom:</span>
-      <input type="text" class="editable-time" id="slotNameInput" value="${slot.name || 'Créneau'}" style="min-width: 120px; text-align: left;">
+      <input type="text" class="editable-name" id="slotNameInput" value="${slot.name || 'Créneau'}">
+    </div>
+    <div class="slot-info-row">
+      <span class="slot-info-label">Date:</span>
+      <input type="date" class="editable-date" id="slotDateInput" value="${formatDateForInput(viewDate)}">
     </div>
     <div class="slot-info-row">
       <span class="slot-info-label">Heure début:</span>
@@ -270,14 +327,14 @@ function updateSlotInfo(slot) {
     </div>
   `;
   
-  // Ajouter les événements pour le nom
+  // Événements pour le nom (inchangés)
   const slotNameInput = document.getElementById('slotNameInput');
   
   function updateSlotName() {
     const newName = slotNameInput.value.trim();
     if (newName) {
       slot.name = newName;
-      renderGrid(); // Re-rendre pour mettre à jour l'affichage
+      renderGrid();
     }
   }
   
@@ -288,7 +345,23 @@ function updateSlotInfo(slot) {
     }
   });
   
-  // Événements existants pour les heures...
+  // Événements pour la date
+  const slotDateInput = document.getElementById('slotDateInput');
+  
+  function updateSlotDate() {
+    const newDateStr = slotDateInput.value;
+    if (!newDateStr) return;
+    
+    const newDate = new Date(newDateStr);
+    if (isNaN(newDate.getTime())) return;
+    
+    moveSlotToNewDateTime(slot, newDate, slot.start);
+    closeSideMenu(); // Fermer le menu après déplacement
+  }
+  
+  slotDateInput.addEventListener('change', updateSlotDate);
+  
+  // Événements pour les heures (inchangés)
   const startTimeInput = document.getElementById('startTimeInput');
   const endTimeInput = document.getElementById('endTimeInput');
   
@@ -389,7 +462,8 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 function startDrag(e){
   if(e.type==='mousedown' && e.button!==0) return;
-  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return; // Ajouter settingsPanel.classList.contains('open')
+  if(isDraggingSlot) return; // Ajouter cette ligne
+  if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
 
   isDragging=true;
   isDragging=true;
@@ -526,6 +600,187 @@ function endDrag(e){
   if(selectionEl){ selectionEl.remove(); selectionEl = null; }
 }
 
+
+// Ajouter ces nouvelles fonctions après la fonction endDrag() :
+
+// Modifier la fonction startSlotDrag pour détecter le mouvement :
+function startSlotDrag(e, slot, element) {
+  if (e.type === 'mousedown' && e.button !== 0) return;
+  if (slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
+  
+  e.stopPropagation();
+  e.preventDefault();
+  
+  let hasMovedForDrag = false; // Ajouter cette variable
+  const startX = e.touches ? e.touches[0].clientX : e.clientX;
+  const startY = e.touches ? e.touches[0].clientY : e.clientY;
+  
+  const rect = element.getBoundingClientRect();
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  
+  slotDragOffset = {
+    x: clientX - rect.left,
+    y: clientY - rect.top
+  };
+  
+  function onMove(moveEvent) {
+    const currentX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+    const currentY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
+    const distance = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
+    
+    if (distance > 5 && !hasMovedForDrag) { // Seuil de 5px pour commencer le drag
+      hasMovedForDrag = true;
+      isDraggingSlot = true;
+      draggedSlot = slot;
+      draggedSlotElement = element;
+      
+      // Pas d'effets visuels bizarres, juste le curseur
+      element.style.cursor = 'grabbing';
+    }
+    
+    if (hasMovedForDrag) {
+      onSlotDrag(moveEvent);
+    }
+  }
+  
+  function onEnd(endEvent) {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onEnd);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onEnd);
+    
+    if (hasMovedForDrag) {
+      endSlotDrag(endEvent);
+    } else {
+      // Clic simple - ouvrir le menu
+      if (!slotMenu.classList.contains('open') && !taskPanel.classList.contains('open') && !taskEditor.classList.contains('open') && !settingsPanel.classList.contains('open')) {
+        openSlotMenu(slot);
+      }
+    }
+    
+    element.style.cursor = 'pointer';
+  }
+  
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+  window.addEventListener('touchmove', onMove, {passive: false});
+  window.addEventListener('touchend', onEnd);
+}
+
+// Modifier la fonction onSlotDrag pour mettre à jour les heures en temps réel :
+function onSlotDrag(e) {
+  if (!isDraggingSlot || !draggedSlotElement) return;
+  
+  e.preventDefault();
+  
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  
+  // Calculer la nouvelle position en tenant compte de l'offset initial
+  const calendarWrap = document.querySelector('.calendar-wrap');
+  const calendarRect = calendarWrap.getBoundingClientRect();
+  const relativeY = clientY - calendarRect.top + calendarWrap.scrollTop - slotDragOffset.y;
+  const newStartMinute = Math.max(0, Math.min(24 * 60 - (draggedSlot.end - draggedSlot.start), Math.floor(relativeY / hourHeight * 60 / 15) * 15));
+  const newEndMinute = newStartMinute + (draggedSlot.end - draggedSlot.start);
+  
+  // Mettre à jour visuellement la position du slot
+  draggedSlotElement.style.top = (newStartMinute / 60 * hourHeight + 6) + 'px';
+  
+  // Mettre à jour l'affichage des heures en temps réel
+  const timeDisplay = draggedSlotElement.querySelector('.time');
+  if (timeDisplay) {
+    timeDisplay.textContent = `${minutesToTime(newStartMinute)} — ${minutesToTime(newEndMinute)}`;
+  }
+}
+
+
+// Modifier la fonction endSlotDrag :
+function endSlotDrag(e) {
+  if (!isDraggingSlot || !draggedSlot || !draggedSlotElement) return;
+  
+  isDraggingSlot = false;
+  
+  const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+  
+  // Calculer la nouvelle position en tenant compte de l'offset initial
+  const calendarWrap = document.querySelector('.calendar-wrap');
+  const calendarRect = calendarWrap.getBoundingClientRect();
+  const relativeY = clientY - calendarRect.top + calendarWrap.scrollTop - slotDragOffset.y;
+  const duration = draggedSlot.end - draggedSlot.start;
+  const newStartMinute = Math.max(0, Math.min(24 * 60 - duration, Math.floor(relativeY / hourHeight * 60 / 15) * 15));
+  
+  // Vérifier les chevauchements
+  const key = isoDateKey(viewDate);
+  const daySlots = store[key] || [];
+  const newSlot = { start: newStartMinute, end: newStartMinute + duration };
+  const hasOverlap = daySlots.some(s => 
+    s !== draggedSlot && !(newSlot.end <= s.start || newSlot.start >= s.end)
+  );
+  
+  if (!hasOverlap) {
+    // Mettre à jour les données du slot
+    draggedSlot.start = newStartMinute;
+    draggedSlot.end = newStartMinute + duration;
+  }
+  
+  // Re-rendre la grille pour finaliser l'affichage
+  renderGrid();
+  
+  // Nettoyer
+  draggedSlot = null;
+  draggedSlotElement = null;
+}
+
+
+function moveSlotToNewDateTime(slot, newDate, newStartMinute) {
+  const duration = slot.end - slot.start;
+  const oldKey = isoDateKey(viewDate);
+  const newKey = isoDateKey(newDate);
+  
+  // Valider les nouvelles heures
+  if (newStartMinute < 0) newStartMinute = 0;
+  if (newStartMinute + duration > 24 * 60) newStartMinute = 24 * 60 - duration;
+  
+  const newSlot = {
+    ...slot,
+    start: newStartMinute,
+    end: newStartMinute + duration
+  };
+  
+  // Vérifier les chevauchements dans le nouveau jour
+  const newDaySlots = store[newKey] || [];
+  const hasOverlap = newDaySlots.some(s => 
+    s !== slot && !(newSlot.end <= s.start || newSlot.start >= s.end)
+  );
+  
+  if (hasOverlap) {
+    // Annuler le déplacement en cas de chevauchement
+    renderGrid();
+    return;
+  }
+  
+  // Supprimer de l'ancien jour
+  if (store[oldKey]) {
+    const index = store[oldKey].indexOf(slot);
+    if (index > -1) {
+      store[oldKey].splice(index, 1);
+    }
+  }
+  
+  // Ajouter au nouveau jour
+  if (!store[newKey]) store[newKey] = [];
+  store[newKey].push(newSlot);
+  
+  // Si on change de jour, naviguer vers le nouveau jour
+  if (oldKey !== newKey) {
+    openDay(newDate);
+  } else {
+    renderGrid();
+  }
+}
+
+
+
 grid.addEventListener('mousedown', startDrag);
 grid.addEventListener('touchstart', startDrag, {passive:false});
 
@@ -563,6 +818,8 @@ function renderTaskTypeGrid(preferences) {
       valueDisplay.textContent = Math.round(value * 100) + '%';
       if(currentEditingSlot) {
         currentEditingSlot.taskPreferences[type.name] = value;
+        // Mettre à jour la couleur du slot en temps réel
+        renderGrid();
       }
     });
     
