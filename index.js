@@ -46,7 +46,7 @@ const store = {};
 const tasks = [];
 let editingTaskIndex = -1;
 let currentEditingSlot = null;
-
+let isCreatingNewSlot = false;
 
 // Ajouter après les variables existantes :
 let isDraggingSlot = false;
@@ -112,8 +112,8 @@ function getSlotColor(slot) {
 		}
 	});
 	
-	// Si aucun type n'est majoritaire (> 0.5) ou si le score max est 0, couleur par défaut
-	if (!dominantType || maxScore <= 0.5) {
+	// Si aucun type n'est majoritaire ou si le score max est 0, couleur par défaut
+	if (!dominantType) {
 		return '#4f46e5'; // Couleur par défaut (accent)
 	}
 	
@@ -175,6 +175,8 @@ function renderTaskList(){
 
 // Open task editor
 function openTaskEditor(taskIndex = -1){
+	if (!canEditData()) return;
+	
 	editingTaskIndex = taskIndex;
 	
 	if(taskIndex >= 0){
@@ -210,6 +212,8 @@ function closeTaskEditorFunc(){
 }
 // Save task
 function saveTask(){
+	if (!canEditData()) return;
+	
 	const name = taskName.value.trim();
 	const duration = parseInt(taskDuration.value);
 	const type = taskType.value;
@@ -233,6 +237,8 @@ function saveTask(){
 
 // Delete task
 function deleteTask(){
+	if (!canEditData()) return;
+	
 	if(editingTaskIndex < 0)
 		return;
 
@@ -282,6 +288,8 @@ function deleteTask(){
 
 // Delete slot
 function deleteSlot() {
+	if (!canEditData()) return;
+	
 	if (!currentEditingSlot) return;
 	
 	const slotName = currentEditingSlot.name || "Ce créneau";
@@ -322,6 +330,8 @@ function deleteSlot() {
 }
 
 function emptySlot() {
+	if (!canEditData()) return;
+	
 	if (!currentEditingSlot) return;
 
 	const completion = completions.get(currentEditingSlot);
@@ -483,6 +493,8 @@ function updateSlotInfo(slot) {
 	const slotNameInput = document.getElementById('slotNameInput');
 	
 	function updateSlotName() {
+		if (!canEditData()) return;
+	
 		const newName = slotNameInput.value.trim();
 		if (newName) {
 			slot.name = newName;
@@ -501,6 +513,8 @@ function updateSlotInfo(slot) {
 	const slotDateInput = document.getElementById('slotDateInput');
 	
 	function updateSlotDate() {
+		if (!canEditData()) return;
+	
 		const newDateStr = slotDateInput.value;
 		if (!newDateStr) return;
 		
@@ -518,6 +532,8 @@ function updateSlotInfo(slot) {
 	const endTimeInput = document.getElementById('endTimeInput');
 	
 	function updateSlotTimes() {
+		if (!canEditData()) return;
+	
 		const startMinutes = parseTimeInput(startTimeInput.value);
 		const endMinutes = parseTimeInput(endTimeInput.value);
 		
@@ -647,9 +663,19 @@ function updatePlacementButtonsState() {
 
 // Event listeners
 closeMenu.addEventListener('click', e=>{ e.stopPropagation(); closeSideMenu(); });
-prevBtn.addEventListener('click',()=>{ const d=new Date(viewDate); d.setDate(d.getDate()-1); openDay(d); });
-nextBtn.addEventListener('click',()=>{ const d=new Date(viewDate); d.setDate(d.getDate()+1); openDay(d); });
+prevBtn.addEventListener('click',()=>{ 
+    if (!canEditData()) return; // Ajouter cette ligne
+    const d=new Date(viewDate); 
+    d.setDate(d.getDate()-1); 
+    openDay(d); 
+});
 
+nextBtn.addEventListener('click',()=>{ 
+    if (!canEditData()) return; // Ajouter cette ligne
+    const d=new Date(viewDate); 
+    d.setDate(d.getDate()+1); 
+    openDay(d); 
+});
 document.getElementById('deleteSlotBtn').addEventListener('click', deleteSlot);
 document.getElementById('emptySlotBtn').addEventListener('click', emptySlot);
 
@@ -685,6 +711,8 @@ function clientRectTop(el){ return el.getBoundingClientRect().top + (window.scro
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 function startDrag(e){
+	if (!canEditData()) return;
+
 	if(e.type==='mousedown' && e.button!==0) return;
 	if(isDraggingSlot) return;
 	if(slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
@@ -739,6 +767,8 @@ function endDrag(e){
 	window.removeEventListener('touchmove', onDrag);
 	window.removeEventListener('touchend', endDrag);
 
+	e.stopPropagation();
+    e.preventDefault();
 	const rect = slotLayer.getBoundingClientRect();
 
 	function isOverlapping(slot){
@@ -769,7 +799,13 @@ function endDrag(e){
 			openSlotMenu(slot);
 		};
 
+		isCreatingNewSlot = true;
 		openSlotMenu(slot);
+		
+		// Reset le flag après un court délai
+		setTimeout(() => {
+			isCreatingNewSlot = false;
+		}, 50);
 	}
 
 	let targetEl;
@@ -826,6 +862,8 @@ function endDrag(e){
 }
 
 function startSlotDrag(e, slot, element) {
+	if (!canEditData()) return;
+	
 	if (e.type === 'mousedown' && e.button !== 0) return;
 	if (slotMenu.classList.contains('open') || taskPanel.classList.contains('open') || taskEditor.classList.contains('open') || settingsPanel.classList.contains('open')) return;
 	
@@ -1041,6 +1079,8 @@ function renderTaskTypeGrid(preferences) {
 		const valueDisplay = row.querySelector('.task-preference-value');
 		
 		slider.addEventListener('input', () => {
+			if (!canEditData()) return;
+	
 			const value = parseFloat(slider.value);
 			valueDisplay.textContent = Math.round(value * 100) + '%';
 			if(currentEditingSlot) {
@@ -1098,6 +1138,8 @@ function renderTaskTypesList() {
 
 // Update task type color
 function updateTaskTypeColor(index, newColor) {
+	if (!canEditData()) return;
+	
 	const oldColor = taskTypes[index].color;
 	taskTypes[index].color = newColor;
 	
@@ -1115,6 +1157,8 @@ function updateTaskTypeColor(index, newColor) {
 
 // Update task type name
 function updateTaskTypeName(index, newName) {
+	if (!canEditData()) return;
+	
 	if (!newName || newName === taskTypes[index].name) return;
 	
 	// Vérifier que le nom n'existe pas déjà
@@ -1222,6 +1266,8 @@ function deleteTaskType(index) {
 
 // Add new task type
 function addNewTaskType() {
+	if (!canEditData()) return;
+	
 	const newType = {
 		name: `Nouveau type ${taskTypes.length + 1}`,
 		color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`
@@ -1355,6 +1401,7 @@ placeTasksBtn.addEventListener('click', placeTasks);
 cancelAlgoBtn.addEventListener('click', cancelAlgo);
 
 removePlacementTasksBtn.addEventListener('click', () => {
+	if (!canEditData()) return;
 	// Vider toutes les completions
 	completions.clear();
 	
@@ -1378,7 +1425,9 @@ removePlacementTasksBtn.addEventListener('click', () => {
 
 // Close panels on outside click
 document.addEventListener('click', e => {
-	if(slotMenu.classList.contains('open') && !slotMenu.contains(e.target)){
+	
+
+	if(slotMenu.classList.contains('open') && !slotMenu.contains(e.target) && !isCreatingNewSlot) {
 		closeSideMenu();
 		e.stopPropagation();
 	}
