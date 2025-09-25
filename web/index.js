@@ -227,11 +227,50 @@ function saveTask(){
 
 // Delete task
 function deleteTask(){
-	if(editingTaskIndex >= 0){
-		tasks.splice(editingTaskIndex, 1);
-		renderTaskList();
-		closeTaskEditorFunc();
+	if(editingTaskIndex < 0)
+		return;
+
+
+	const taskToDelete = tasks[editingTaskIndex];
+	
+	// 1. Supprimer la tâche du array tasks
+	tasks.splice(editingTaskIndex, 1);
+	
+	// 2. Nettoyer les completions - parcourir toutes les entrées de la Map
+	const slotsToUpdate = [];
+	completions.forEach((taskList, slot) => {
+		// Filtrer les tâches pour retirer celle supprimée (comparaison par référence d'objet)
+		const filteredTasks = taskList.filter(task => task !== taskToDelete);
+		
+		// Si la liste a changé, marquer le slot pour mise à jour
+		if (filteredTasks.length !== taskList.length) {
+			slotsToUpdate.push(slot);
+			
+			if (filteredTasks.length === 0) {
+				// Plus de tâches assignées : supprimer l'entrée de la Map
+				completions.delete(slot);
+			} else {
+				// Mettre à jour avec la liste filtrée
+				completions.set(slot, filteredTasks);
+			}
+		}
+	});
+	
+	console.log(`Tâche "${taskToDelete.name}" supprimée de ${slotsToUpdate.length} slot(s)`);
+	
+	// 3. Mettre à jour l'affichage
+	renderTaskList();
+	renderGrid(); // Important : re-render pour mettre à jour l'affichage des slots
+	
+	// 4. Mettre à jour le menu du slot si ouvert
+	if (currentEditingSlot && slotMenu.classList.contains('open')) {
+		updateSlotInfo(currentEditingSlot);
 	}
+	
+	// 5. Vérifier l'état des boutons de placement
+	updatePlacementButtonsState();
+	
+	closeTaskEditorFunc();
 }
 
 // Update floating button visibility
@@ -490,36 +529,60 @@ function showCompletions() {
 		const daySlots = store[key] || [];
 		const slot = daySlots.find(s => s.start === start && s.end === end);
 		
+		// Nettoyer les anciennes tâches affichées
+		let tasksContainer = slotElement.querySelector('.slot-tasks');
+		if (tasksContainer) {
+			tasksContainer.remove();
+		}
 
 		if (slot && completions.has(slot)) {
 			const assignedTasks = completions.get(slot);
 			
-			// Créer ou mettre à jour la zone des tâches
-			let tasksContainer = slotElement.querySelector('.slot-tasks');
-			if (!tasksContainer) {
+			// Créer la zone des tâches seulement s'il y en a
+			if (assignedTasks.length > 0) {
 				tasksContainer = document.createElement('div');
 				tasksContainer.className = 'slot-tasks';
+				
+				// Remplir avec les tâches
+				assignedTasks.forEach(task => {
+					const taskElement = document.createElement('div');
+					taskElement.className = 'slot-task';
+					taskElement.textContent = task.name;
+					
+					// Trouver la couleur du type de tâche
+					const taskTypeObj = taskTypes.find(t => t.name === task.type);
+					if (taskTypeObj) {
+						taskElement.style.backgroundColor = taskTypeObj.color;
+					}
+					
+					tasksContainer.appendChild(taskElement);
+				});
+				
 				slotElement.appendChild(tasksContainer);
 			}
-			
-			// Vider et remplir avec les nouvelles tâches
-			tasksContainer.innerHTML = '';
-			assignedTasks.forEach(task => {
-				const taskElement = document.createElement('div');
-				taskElement.className = 'slot-task';
-				taskElement.textContent = task.name;
-				
-				// Trouver la couleur du type de tâche
-				const taskTypeObj = taskTypes.find(t => t.name === task.type);
-				if (taskTypeObj) {
-					taskElement.style.backgroundColor = taskTypeObj.color;
-				}
-				
-				tasksContainer.appendChild(taskElement);
-			});
 		}
 	});
 }
+
+
+
+
+// Mettre à jour l'état des boutons de placement selon les completions
+function updatePlacementButtonsState() {
+	const hasAnyCompletions = completions.size > 0;
+	
+	if (hasAnyCompletions) {
+		// Il y a encore des tâches assignées
+		removePlacementTasksBtn.classList.remove("hidden");
+		placeTasksBtn.classList.add("hidden");
+	} else {
+		// Plus aucune tâche assignée
+		removePlacementTasksBtn.classList.add("hidden");
+		placeTasksBtn.classList.remove("hidden");
+	}
+}
+
+
 // Event listeners
 closeMenu.addEventListener('click', e=>{ e.stopPropagation(); closeSideMenu(); });
 prevBtn.addEventListener('click',()=>{ const d=new Date(viewDate); d.setDate(d.getDate()-1); openDay(d); });
@@ -1164,7 +1227,6 @@ async function placeTasks() {
 	
 	try {
 		const newCompletions = await runAlgoInWorker(store, tasks, taskTypes);
-
 		
 		// Nettoyer le timer
 		clearInterval(timer);
@@ -1233,8 +1295,19 @@ placeTasksBtn.addEventListener('click', placeTasks);
 cancelAlgoBtn.addEventListener('click', cancelAlgo);
 
 removePlacementTasksBtn.addEventListener('click', () => {
-	removePlacementTasksBtn.classList.add("hidden");
-	placeTasksBtn.classList.remove("hidden");
+	// Vider toutes les completions
+	completions.clear();
+	
+	// Mettre à jour l'affichage
+	renderGrid();
+	
+	// Mettre à jour le menu du slot si ouvert
+	if (currentEditingSlot && slotMenu.classList.contains('open')) {
+		updateSlotInfo(currentEditingSlot);
+	}
+	
+	// Mettre à jour l'état des boutons
+	updatePlacementButtonsState();
 });
 
 

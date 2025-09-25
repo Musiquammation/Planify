@@ -19,24 +19,23 @@ function runAlgoInWorker(store, tasks, taskTypes, lossOrder = 0.4) {
 			if (action === "result") {
 				const ouput = new Map();
 				for (let line of result) {
-					const key = line[0];
-					const slotArr = store[key.dateKey];
+					const slotArr = store[line.dateKey];
 					if (!slotArr) {
 						console.warn("Date not stored");
 						continue;
 					}
 
-					const slot = slotArr.find(s => s.runId == key.runId);
+					const slot = slotArr.find(s => s.runId == line.runId);
 					if (!slot) {
 						console.warn("Slot not found");
 						continue;
 					}
 
-					ouput.set(slot, line[1]);
+					ouput.set(slot, line.list.map(t => tasks[t]));
 				}
-				console.log(ouput);
 
-				resolve(ouput); // reconstruit le Map
+
+				resolve(ouput);
 
 				worker.terminate();
 			} else if (action === "error") {
