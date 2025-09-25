@@ -868,3 +868,142 @@ button:hover{background:rgba(255,255,255,0.02)}
     font-size: 10px;
   }
 }
+
+
+
+
+/* Place tasks button */
+.place-tasks-btn {
+	background: var(--accent);
+	color: white;
+	border: none;
+	padding: 12px;
+	border-radius: 8px;
+	font-weight: 600;
+	margin-top: 8px;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+
+.place-tasks-btn:hover {
+	background: #4338ca;
+}
+
+.place-tasks-btn:disabled {
+	background: var(--muted);
+	cursor: not-allowed;
+}
+
+/* Algorithm loading */
+.algo-loading {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(15, 23, 36, 0.95);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	z-index: 10;
+	padding: 20px;
+	text-align: center;
+}
+
+.loading-spinner {
+	width: 48px;
+	height: 48px;
+	border: 4px solid rgba(255, 255, 255, 0.1);
+	border-left: 4px solid var(--accent);
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+	margin-bottom: 16px;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+	font-size: 16px;
+	font-weight: 600;
+	color: #e6eef8;
+	margin-bottom: 20px;
+	position: relative;
+}
+
+.loading-dots {
+	display: inline-block;
+	width: 20px;
+	text-align: left;
+}
+
+.loading-dots::after {
+	content: '';
+	animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+	0%, 20% {
+		content: '';
+	}
+	40% {
+		content: '.';
+	}
+	60% {
+		content: '..';
+	}
+	80%, 100% {
+		content: '...';
+	}
+}
+
+.loading-elapsed {
+	font-size: 14px;
+	color: var(--muted);
+	margin-bottom: 8px;
+	opacity: 0.8;
+}
+
+.loading-spinner {
+	width: 48px;
+	height: 48px;
+	border: 4px solid rgba(255, 255, 255, 0.1);
+	border-left: 4px solid var(--accent);
+	border-radius: 50%;
+	animation: spin 10.0s linear infinite;
+	margin-bottom: 16px;
+}
+
+.hidden {
+	display: none;
+}
+
+
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  5%   { transform: rotate(100deg); }
+  10%  { transform: rotate(220deg); }
+  15%  { transform: rotate(360deg); }
+  20%  { transform: rotate(520deg); }
+  25%  { transform: rotate(700deg); }
+  30%  { transform: rotate(900deg); }
+  35%  { transform: rotate(1120deg); }
+  40%  { transform: rotate(1360deg); }
+  45%  { transform: rotate(1620deg); }
+  50%  { transform: rotate(1800deg); }   /* 4 tours */
+  55%  { transform: rotate(1980deg); }
+  60%  { transform: rotate(2240deg); }
+  65%  { transform: rotate(2480deg); }
+  70%  { transform: rotate(2700deg); }
+  75%  { transform: rotate(2900deg); }
+  80%  { transform: rotate(3080deg); }
+  85%  { transform: rotate(3240deg); }
+  90%  { transform: rotate(3360deg); }
+  95%  { transform: rotate(3440deg); }
+  100% { transform: rotate(3880deg); }   /* 8 tours pile */
+}
+
