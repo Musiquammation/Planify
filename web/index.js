@@ -12,7 +12,6 @@ const slotInfo = document.getElementById('slotInfo');
 
 const openTaskPannelBtn = document.getElementById('openTaskPannelBtn');
 const taskPanel = document.getElementById('taskPanel');
-const closeTaskPanel = document.getElementById('closeTaskPanel');
 const taskList = document.getElementById('taskList');
 const addTaskBtn = document.getElementById('addTaskBtn');
 
@@ -54,6 +53,13 @@ let isDraggingSlot = false;
 let draggedSlot = null;
 let draggedSlotElement = null;
 let slotDragOffset = { x: 0, y: 0 };
+
+let lossOrder = 0.0;
+
+
+function canEditData() {
+	return window.isRunningAlgo === false;
+}
 
 // Task types
 const taskTypes = [
@@ -272,6 +278,62 @@ function deleteTask(){
 	
 	closeTaskEditorFunc();
 }
+
+
+// Delete slot
+function deleteSlot() {
+	if (!currentEditingSlot) return;
+	
+	const slotName = currentEditingSlot.name || "Ce créneau";
+	const hasAssignedTasks = completions.has(currentEditingSlot) && completions.get(currentEditingSlot).length > 0;
+	
+	// Message de confirmation différent selon s'il y a des tâches assignées
+	let confirmMessage = `Êtes-vous sûr de vouloir supprimer "${slotName}" ?`;
+	if (hasAssignedTasks) {
+		const taskCount = completions.get(currentEditingSlot).length;
+		confirmMessage += `\n\nAttention : ce créneau contient ${taskCount} tâche(s) assignée(s) qui seront aussi supprimées du planning.`;
+	}
+	
+	
+	// 1. Supprimer du store
+	const key = isoDateKey(viewDate);
+	if (store[key]) {
+		const slotIndex = store[key].indexOf(currentEditingSlot);
+		if (slotIndex > -1) {
+			store[key].splice(slotIndex, 1);
+		}
+	}
+	
+	// 2. Supprimer des completions si présent
+	if (completions.has(currentEditingSlot)) {
+		completions.delete(currentEditingSlot);
+		console.log(`Suppression du slot "${slotName}" et de ses tâches assignées`);
+	}
+	
+	// 3. Fermer le menu
+	closeSideMenu();
+	currentEditingSlot = null;
+	
+	// 4. Mettre à jour l'affichage
+	renderGrid();
+	
+	// 5. Mettre à jour l'état des boutons de placement
+	updatePlacementButtonsState();
+}
+
+function emptySlot() {
+	if (!currentEditingSlot) return;
+
+	const completion = completions.get(currentEditingSlot);
+	if (!completion) return;
+
+	completion.length = 0; // empty array
+
+	updateSlotInfo(currentEditingSlot);
+	renderGrid();
+	updatePlacementButtonsState();
+}
+
 
 // Update floating button visibility
 // Remplacer cette fonction :
@@ -588,15 +650,17 @@ closeMenu.addEventListener('click', e=>{ e.stopPropagation(); closeSideMenu(); }
 prevBtn.addEventListener('click',()=>{ const d=new Date(viewDate); d.setDate(d.getDate()-1); openDay(d); });
 nextBtn.addEventListener('click',()=>{ const d=new Date(viewDate); d.setDate(d.getDate()+1); openDay(d); });
 
+document.getElementById('deleteSlotBtn').addEventListener('click', deleteSlot);
+document.getElementById('emptySlotBtn').addEventListener('click', emptySlot);
+
+
+
+
 openTaskPannelBtn.addEventListener('click', e => {
 	e.stopPropagation();
 	openTaskPanel();
 });
 
-closeTaskPanel.addEventListener('click', e => {
-	e.stopPropagation();
-	closeTaskPanelFunc();
-});
 
 addTaskBtn.addEventListener('click', () => {
 	taskPanel.classList.remove('open'); // Close task panel first
@@ -1226,7 +1290,7 @@ async function placeTasks() {
 	const timer = setInterval(updateElapsedTime, 100);
 	
 	try {
-		const newCompletions = await runAlgoInWorker(store, tasks, taskTypes);
+		const newCompletions = await runAlgoInWorker(store, tasks, taskTypes, lossOrder);
 		
 		// Nettoyer le timer
 		clearInterval(timer);
@@ -1256,18 +1320,14 @@ async function placeTasks() {
 		// Nettoyer le timer
 		clearInterval(timer);
 		
-		console.error('Erreur lors du placement des tâches:', error);
+		console.error(error);
 		algoLoading.style.display = 'none';
 		placeTasksBtn.disabled = false;
-		
-		if (error.message !== 'Algorithme annulé') {
-			alert('Erreur lors du placement des tâches');
-		}
 	}
 }
 
 function cancelAlgo() {
-	if (stopAlgo()) {
+	if (stopAlgoInWorker()) {
 		algoLoading.style.display = 'none';
 		placeTasksBtn.disabled = false;
 	}
@@ -1277,14 +1337,14 @@ function cancelAlgo() {
 
 
 function cancelAlgo() {
-	if (stopAlgo()) {
+	if (stopAlgoInWorker()) {
 		algoLoading.style.display = 'none';
 		placeTasksBtn.disabled = false;
 	}
 }
 
 function cancelAlgo() {
-	if (stopAlgo()) {
+	if (stopAlgoInWorker()) {
 		algoLoading.style.display = 'none';
 		placeTasksBtn.disabled = false;
 	}
@@ -1339,11 +1399,6 @@ document.addEventListener('click', e => {
 
 
 // Ajoutez après les autres event listeners
-const saveSlotBtn = document.getElementById('saveSlotBtn');
-saveSlotBtn.addEventListener('click', () => {
-	// Les préférences sont déjà sauvegardées en temps réel
-	closeSideMenu();
-});
 
 // Settings event listeners
 settingsBtn.addEventListener('click', e => {
