@@ -31,7 +31,7 @@ Module.onRuntimeInitialized = () => {
 
 
 
-function runAlgo(store, tasks, taskTypes, lossOrder = 0.4) {
+function runAlgo(store, tasks, taskTypes, lossOrder) {
 	return new Promise(async (resolve, reject) => {
 		function buildBuffer(slots) {
 			// Calculate total size

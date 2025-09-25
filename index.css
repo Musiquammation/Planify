@@ -315,6 +315,7 @@ button:hover{background:rgba(255,255,255,0.02)}
 	flex-shrink:0; /* Empêche la réduction des boutons */
 	margin-top:auto; /* Pousse vers le bas */
 }
+
 .btn-primary{
 	background:var(--accent);
 	color:white;
@@ -324,6 +325,9 @@ button:hover{background:rgba(255,255,255,0.02)}
 	font-weight:600;
 	flex:1;
 }
+.btn-primary:hover {
+	background: var(--accent);
+}
 .btn-danger{
 	background:#dc2626;
 	color:white;
@@ -332,6 +336,9 @@ button:hover{background:rgba(255,255,255,0.02)}
 	border-radius:8px;
 	font-weight:600;
 }
+.btn-danger:hover {
+	background:#dc2626;
+}
 .btn-secondary{
 	background:transparent;
 	color:var(--muted);
@@ -339,6 +346,9 @@ button:hover{background:rgba(255,255,255,0.02)}
 	padding:12px 24px;
 	border-radius:8px;
 	font-weight:600;
+}
+.btn-secondary:hover {
+	background:transparent;
 }
 
 /* scrollbar custom */
