@@ -15,7 +15,7 @@ self.onmessage = async (event) => {
 		try {
 			const completions = await runAlgo(store, tasks, taskTypes, lossOrder);
 			// Map → Array pour pouvoir passer en postMessage
-			self.postMessage({ action: "result", result: Array.from(completions.entries()) });
+			self.postMessage({ action: "result", result: completions });
 		} catch (err) {
 			self.postMessage({ action: "error", error: err.message });
 		}
@@ -141,7 +141,7 @@ function runAlgo(store, tasks, taskTypes, lossOrder = 0.4) {
 
 		
 		// Parse result
-		const completions = new Map();
+		const completions = new Array(slots.length);
 		const slotPtr = resultPtr;
 		const lostTaskPtr = resultPtr + branchListSize;
 		for (let s = 0; s < slots.length; s++) {
@@ -153,11 +153,11 @@ function runAlgo(store, tasks, taskTypes, lossOrder = 0.4) {
 					Module.HEAPU8[lostTaskPtr + t] == 0 &&
 					Module.getValue(slotPtr + 8*t, "i32") == s
 				) {
-					list.push(tasks[t]);
+					list.push(t);
 				}
 			}
 
-			completions.set({runId: slots[s].runId, dateKey: slots[s].dateKey}, list);
+			completions[s] = {runId: slots[s].runId, dateKey: slots[s].dateKey, list};
 		}
 
 
