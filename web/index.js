@@ -1713,7 +1713,7 @@ function initTest(kind) {
 
 
 // Initialize
-initTest(0);
+// initTest(0);
 initTaskTypes();
 initTimes();
 renderTaskList();
