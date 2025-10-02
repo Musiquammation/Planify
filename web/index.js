@@ -77,7 +77,6 @@ function registerTypes() {
 }
 
 function loadData() {
-	taskTypes.length = 0;
 	tasks.length = 0;
 
 	let obj = localStorage.getItem('stores');
@@ -92,6 +91,7 @@ function loadData() {
 
 	obj = localStorage.getItem('types');
 	if (obj) {
+		taskTypes.length = 0;
 		for (let t of JSON.parse(obj)) {
 			taskTypes.push(t);
 		}
