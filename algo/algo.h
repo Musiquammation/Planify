@@ -4,10 +4,39 @@
 #include "declarations.h"
 
 
+enum {
+	CONFLICT = -1,
+	AVAILABLE = -2,
+};
 
-void sortTasks(Task* tasks, int tasks_len);
+typedef struct {
+	const Task* task;
+	int duration;
+	int type;
+	int level;
+} Unit;
 
-void runAlgo(float lossOrder);
+
+typedef struct {
+	int* options;
+	int* scores;
+	int fullDuration;
+	int score;
+} Layer;
+
+
+typedef struct {
+	Unit* units;
+	Layer* layers;
+} data_t;
+
+
+
+extern data_t data;
+
+
+int* runAlgo(void);
 
 
 #endif
+

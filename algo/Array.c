@@ -46,16 +46,22 @@ void* Array_pushSafeArray(Array* array) {
 	
 	// Realloc
 	const size_t size = array->size;
-	void* const newData = malloc(size * (reserved + ARRAY_CURRENT_ALLOWED_BUFFER_SIZE));
+	void* newData;
+	int nextReserved;
 	
 	if (reserved) {
+		nextReserved = reserved<<1;
+		newData = malloc(size * nextReserved);
 		void* const oldData = array->data;
 		memcpy(newData, oldData, reserved * size);
 		free(oldData);
+	} else {
+		nextReserved = 2;
+		newData = malloc(size * nextReserved);
 	}
 
 	array->data = newData;
-	array->reserved += ARRAY_CURRENT_ALLOWED_BUFFER_SIZE;
+	array->reserved = nextReserved;
 	array->length++;
 
 	return newData + length * size;

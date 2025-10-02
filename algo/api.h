@@ -8,6 +8,6 @@
 
 
 void readBuffer(const uint8_t* buffer, size_t bufferSize);
-char* apiRunAlgo(const uint8_t* buffer, int bufferSize, float lossOrder, int* outputPositions);
+int* apiRunAlgo(const uint8_t* buffer, int bufferSize);
 
 #endif

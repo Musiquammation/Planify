@@ -30,8 +30,12 @@ Module.onRuntimeInitialized = () => {
 
 
 
+function toDayNumber(year, month, day) {
+	return Math.floor(new Date(year, month - 1, day).getTime() / (1000 * 60 * 60 * 24));
+}
 
-function runAlgo(store, tasks, taskTypes, lossOrder) {
+
+function runAlgo(store, tasks, taskTypes) {
 	return new Promise(async (resolve, reject) => {
 		function buildBuffer(slots) {
 			// Calculate total size
@@ -95,9 +99,18 @@ function runAlgo(store, tasks, taskTypes, lossOrder) {
 		const slots = [];
 		let globalMinStart = Infinity;
 
+		const todayOffset = toDayNumber(
+			new Date().getFullYear(),
+			new Date().getMonth() + 1,
+			new Date().getDate()
+		);
+
 		Object.keys(store).forEach(dateKey => {
 			const [year, month, day] = dateKey.split("-").map(Number);
-			const dateOffset = new Date(year, month - 1, day).getTime() / (1000 * 60 * 60 * 24);
+			const dateOffset = toDayNumber(year, month, day);
+			if (dateOffset < todayOffset)
+				return;
+
 			store[dateKey].forEach(slot => {
 				const globalStart = dateOffset * 24 * 60 + slot.start;
 				if (globalStart < globalMinStart) {
@@ -108,7 +121,10 @@ function runAlgo(store, tasks, taskTypes, lossOrder) {
 
 		Object.keys(store).forEach(dateKey => {
 			const [year, month, day] = dateKey.split("-").map(Number);
-			const dateOffset = new Date(year, month - 1, day).getTime() / (1000 * 60 * 60 * 24);
+			const dateOffset = toDayNumber(year, month, day);
+			if (dateOffset < todayOffset)
+				return;
+
 			store[dateKey].forEach(slot => {
 				const globalStart = dateOffset * 24 * 60 + slot.start;
 				const globalEnd = dateOffset * 24 * 60 + slot.end;
@@ -117,7 +133,6 @@ function runAlgo(store, tasks, taskTypes, lossOrder) {
 					start: globalStart - globalMinStart,
 					end: globalEnd - globalMinStart,
 					dateKey: dateKey,
-					runId: slot.runId
 				});
 			});
 		});
@@ -127,44 +142,26 @@ function runAlgo(store, tasks, taskTypes, lossOrder) {
 		const inputPtr = Module._malloc(inputBuffer.byteLength);
 		Module.HEAPU8.set(new Uint8Array(inputBuffer), inputPtr);
 
-		const outputPtr = Module._malloc(4);
 
 		// appel de la fonction C
-		const resultPtr = Module._apiRunAlgo(inputPtr, inputBuffer.byteLength, lossOrder, outputPtr);
-
-		// lecture de outputPositions
-		const branchListSize = Module.getValue(outputPtr, "i32");
+		const resultPtr = Module._apiRunAlgo(inputPtr, inputBuffer.byteLength);
 
 		// Free
 		Module._free(inputPtr);
-		Module._free(outputPtr);
 
 		
 		// Parse result
-		const completions = new Array(slots.length);
-		const slotPtr = resultPtr;
-		const lostTaskPtr = resultPtr + branchListSize;
-		for (let s = 0; s < slots.length; s++) {
-			const list = [];
-
-			for (let t = 0; t < tasks.length; t++) {
-				
-				if (
-					Module.HEAPU8[lostTaskPtr + t] == 0 &&
-					Module.getValue(slotPtr + 8*t, "i32") == s
-				) {
-					list.push(t);
-				}
+		const completions = Array.from({ length: slots.length }, () => []);
+		for (let task = 0; task < tasks.length; task++) {
+			const pos = Module.getValue(resultPtr + 4*task, "i32");
+			if (pos >= 0) {
+				completions[pos].push(task);
 			}
-
-			completions[s] = {runId: slots[s].runId, dateKey: slots[s].dateKey, list};
-		}
-
-
-		
+		}		
 
 		// Free
 		Module._free(resultPtr);
+
 
 		// Resolve
 		resolve(completions);

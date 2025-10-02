@@ -54,7 +54,6 @@ let draggedSlot = null;
 let draggedSlotElement = null;
 let slotDragOffset = { x: 0, y: 0 };
 
-let lossOrder = 0.0;
 
 
 function canEditData() {
@@ -664,17 +663,17 @@ function updatePlacementButtonsState() {
 // Event listeners
 closeMenu.addEventListener('click', e=>{ e.stopPropagation(); closeSideMenu(); });
 prevBtn.addEventListener('click',()=>{ 
-    if (!canEditData()) return; // Ajouter cette ligne
-    const d=new Date(viewDate); 
-    d.setDate(d.getDate()-1); 
-    openDay(d); 
+	if (!canEditData()) return; // Ajouter cette ligne
+	const d=new Date(viewDate); 
+	d.setDate(d.getDate()-1); 
+	openDay(d); 
 });
 
 nextBtn.addEventListener('click',()=>{ 
-    if (!canEditData()) return; // Ajouter cette ligne
-    const d=new Date(viewDate); 
-    d.setDate(d.getDate()+1); 
-    openDay(d); 
+	if (!canEditData()) return; // Ajouter cette ligne
+	const d=new Date(viewDate); 
+	d.setDate(d.getDate()+1); 
+	openDay(d); 
 });
 document.getElementById('deleteSlotBtn').addEventListener('click', deleteSlot);
 document.getElementById('emptySlotBtn').addEventListener('click', emptySlot);
@@ -768,7 +767,7 @@ function endDrag(e){
 	window.removeEventListener('touchend', endDrag);
 
 	e.stopPropagation();
-    e.preventDefault();
+	e.preventDefault();
 	const rect = slotLayer.getBoundingClientRect();
 
 	function isOverlapping(slot){
@@ -1336,7 +1335,7 @@ async function placeTasks() {
 	const timer = setInterval(updateElapsedTime, 100);
 	
 	try {
-		const newCompletions = await runAlgoInWorker(store, tasks, taskTypes, lossOrder);
+		const newCompletions = await runAlgoInWorker(store, tasks, taskTypes);
 		
 		// Nettoyer le timer
 		clearInterval(timer);
@@ -1503,7 +1502,7 @@ addTypeBtn.addEventListener('click', addNewTaskType);
 
 
 // Ajouter cette fonction pour tester le système de completions
-function initTest(kind) {
+function initTest(kind=0) {
 	if (kind === 0) {
 		const testTasks = [
 			{name: "t0", duration: 5*15, type: "Maths"},
@@ -1574,133 +1573,161 @@ function initTest(kind) {
 		
 
 	} else if (kind === 1) {
-		if (tasks.length === 0) {
-			const testTasks = [
-				// Maths
-				{ name: "Algèbre", duration: 30, type: "Maths" },
-				{ name: "Géométrie", duration: 45, type: "Maths" },
-				{ name: "Équations", duration: 25, type: "Maths" },
-				{ name: "Fractions", duration: 35, type: "Maths" },
-				{ name: "Calculs", duration: 20, type: "Maths" },
-				
-				// Français
-				{ name: "Lecture", duration: 45, type: "Français" },
-				{ name: "Dictée", duration: 20, type: "Français" },
-				{ name: "Grammaire", duration: 30, type: "Français" },
-				{ name: "Rédaction", duration: 60, type: "Français" },
-				{ name: "Conjugaison", duration: 25, type: "Français" },
-				{ name: "Orthographe", duration: 15, type: "Français" },
-				
-				// Histoire
-				{ name: "Révolutions", duration: 40, type: "Histoire" },
-				{ name: "Moyen Âge", duration: 35, type: "Histoire" },
-				{ name: "Antiquité", duration: 45, type: "Histoire" },
-				{ name: "Dates clés", duration: 20, type: "Histoire" },
-				
-				// Sciences
-				{ name: "Physique", duration: 50, type: "Sciences" },
-				{ name: "Chimie", duration: 40, type: "Sciences" },
-				{ name: "Biologie", duration: 45, type: "Sciences" },
-				{ name: "Expériences", duration: 60, type: "Sciences" },
-				{ name: "Formules", duration: 25, type: "Sciences" },
-				
-				// Sport
-				{ name: "Course", duration: 30, type: "Sport" },
-				{ name: "Étirements", duration: 15, type: "Sport" },
-				{ name: "Musculation", duration: 45, type: "Sport" },
-				{ name: "Cardio", duration: 25, type: "Sport" },
-				
-				// Musique
-				{ name: "Piano", duration: 30, type: "Musique" },
-				{ name: "Solfège", duration: 25, type: "Musique" },
-				{ name: "Chant", duration: 20, type: "Musique" },
-				
-				// Art
-				{ name: "Dessin", duration: 40, type: "Art" },
-				{ name: "Peinture", duration: 60, type: "Art" },
-				{ name: "Sculpture", duration: 50, type: "Art" },
-				
-				// Pause
-				{ name: "Pause café", duration: 15, type: "Pause" },
-				{ name: "Détente", duration: 20, type: "Pause" },
-				{ name: "Méditation", duration: 10, type: "Pause" }
-			];
-			
-			tasks.push(...testTasks);
-		}
-		
-		// Créer quelques créneaux de test pour aujourd'hui
-		const key = isoDateKey(viewDate);
-		if (!store[key]) store[key] = [];
-		
-		// Ajouter des créneaux de test s'ils n'existent pas
-		if (store[key].length === 0) {
-			const slot1 = {
-				start: 9 * 60, // 9h00
-				end: 12 * 60, // 12h00 - Slot de 3h pour tester beaucoup de tâches
-				name: "Session Intensive",
-				taskPreferences: {
-					"Maths": 0.8,
-					"Français": 0.7,
-					"Histoire": 0.6,
-					"Sciences": 0.9,
-					"Sport": 0.2,
-					"Musique": 0.3,
-					"Art": 0.4,
-					"Pause": 0.5
+		const testTasks = [
+			// Maths
+			{ name: "Algèbre avancée", duration: 60, type: "Maths" },
+			{ name: "Analyse", duration: 55, type: "Maths" },
+			{ name: "Équations différentielles", duration: 50, type: "Maths" },
+			{ name: "Probabilités", duration: 45, type: "Maths" },
+			{ name: "Statistiques", duration: 40, type: "Maths" },
+			{ name: "Géométrie avancée", duration: 35, type: "Maths" },
+			{ name: "Topologie", duration: 60, type: "Maths" },
+			{ name: "Logique mathématique", duration: 55, type: "Maths" },
+			{ name: "Calcul matriciel", duration: 50, type: "Maths" },
+
+			// Français
+			{ name: "Lecture approfondie", duration: 45, type: "Français" },
+			{ name: "Rédaction d'essai", duration: 60, type: "Français" },
+			{ name: "Analyse de texte", duration: 40, type: "Français" },
+			{ name: "Commentaire composé", duration: 55, type: "Français" },
+			{ name: "Dissertation", duration: 60, type: "Français" },
+			{ name: "Résumé de texte", duration: 35, type: "Français" },
+			{ name: "Exposé oral", duration: 50, type: "Français" },
+
+			// Sciences
+			{ name: "Projet physique", duration: 60, type: "Sciences" },
+			{ name: "TP chimie", duration: 55, type: "Sciences" },
+			{ name: "Expériences biologie", duration: 50, type: "Sciences" },
+			{ name: "Mécanique", duration: 45, type: "Sciences" },
+			{ name: "Électromagnétisme", duration: 60, type: "Sciences" },
+			{ name: "Thermodynamique", duration: 55, type: "Sciences" },
+			{ name: "Génétique", duration: 40, type: "Sciences" },
+			{ name: "Astrophysique", duration: 60, type: "Sciences" },
+
+			// Histoire
+			{ name: "Antiquité approfondie", duration: 40, type: "Histoire" },
+			{ name: "Révolutions modernes", duration: 55, type: "Histoire" },
+			{ name: "Moyen Âge", duration: 45, type: "Histoire" },
+			{ name: "Première Guerre mondiale", duration: 60, type: "Histoire" },
+			{ name: "Seconde Guerre mondiale", duration: 60, type: "Histoire" },
+			{ name: "Guerre froide", duration: 55, type: "Histoire" },
+			{ name: "Histoire contemporaine", duration: 50, type: "Histoire" },
+
+			// Art
+			{ name: "Peinture grand format", duration: 55, type: "Art" },
+			{ name: "Sculpture", duration: 60, type: "Art" },
+			{ name: "Dessin technique", duration: 50, type: "Art" },
+			{ name: "Croquis", duration: 40, type: "Art" },
+			{ name: "Calligraphie", duration: 45, type: "Art" },
+			{ name: "Art moderne", duration: 60, type: "Art" },
+			{ name: "Histoire de l’art", duration: 55, type: "Art" },
+
+			// Sport
+			{ name: "Entraînement intensif", duration: 60, type: "Sport" },
+			{ name: "Cardio prolongé", duration: 55, type: "Sport" },
+			{ name: "Musculation complète", duration: 60, type: "Sport" },
+			{ name: "Natation", duration: 50, type: "Sport" },
+			{ name: "Yoga avancé", duration: 40, type: "Sport" },
+			{ name: "Boxe", duration: 60, type: "Sport" },
+			{ name: "Football", duration: 60, type: "Sport" }
+		];
+
+
+		tasks.push(...testTasks);
+
+
+		// Jour 1 (aujourd'hui)
+		{
+			const key = isoDateKey(viewDate);
+			if (!store[key]) store[key] = [];
+
+			store[key].push(
+				{
+					start: 8 * 60,
+					end: 12 * 60,
+					name: "Sciences (Jour 1)",
+					taskPreferences: { "Sciences": 0.9, "Maths": 0.6, "Pause": 0.3 }
+				},
+				{
+					start: 13 * 60 + 30,
+					end: 17 * 60 + 30,
+					name: "Lettres (Jour 1)",
+					taskPreferences: { "Français": 0.9, "Histoire": 0.7, "Art": 0.4 }
+				},
+				{
+					start: 18 * 60,
+					end: 19 * 60 + 30,
+					name: "Sport (Jour 1)",
+					taskPreferences: { "Sport": 0.9, "Pause": 0.5 }
 				}
-			};
-			
-			const slot2 = {
-				start: 14 * 60, // 14h00
-				end: 16 * 60, // 16h00
-				name: "Session Après-midi",
-				taskPreferences: {
-					"Maths": 0.2,
-					"Français": 0.7,
-					"Histoire": 0.9,
-					"Sciences": 0.4,
-					"Sport": 0.3,
-					"Musique": 0.6,
-					"Art": 0.8,
-					"Pause": 0.2
-				}
-			};
-			
-			const slot3 = {
-				start: 17 * 60, // 17h00
-				end: 18 * 60 + 30, // 18h30
-				name: "Session Sport",
-				taskPreferences: {
-					"Maths": 0.1,
-					"Français": 0.1,
-					"Histoire": 0.1,
-					"Sciences": 0.2,
-					"Sport": 0.9,
-					"Musique": 0.3,
-					"Art": 0.2,
-					"Pause": 0.4
-				}
-			};
-			
-			store[key].push(slot1, slot2, slot3);
-			
-			// BLINDER le premier slot avec beaucoup de tâches
-			completions.set(slot1, [
-				tasks[0],  // Algèbre
-				tasks[1],  // Géométrie
-				tasks[2],  // Équations
-				tasks[5],  // Lecture
-				tasks[6],  // Dictée
-			]);
-			
-			// Assigner quelques tâches aux autres slots
-			completions.set(slot2, [tasks[8], tasks[13], tasks[28]]); // Rédaction + Antiquité + Peinture
-			completions.set(slot3, [tasks[20], tasks[21], tasks[22], tasks[32]]); // Course + Étirements + Musculation + Méditation
-			
+			);
 		}
 
+		// Jour 2 (demain)
+		{
+			let tomorrow = new Date(viewDate);
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			const key = isoDateKey(tomorrow);
+			if (!store[key]) store[key] = [];
+
+			store[key].push(
+				{
+					start: 8 * 60,
+					end: 12 * 60,
+					name: "Sciences (Jour 2)",
+					taskPreferences: { "Sciences": 0.9, "Maths": 0.6, "Pause": 0.3 }
+				},
+				{
+					start: 13 * 60 + 30,
+					end: 17 * 60 + 30,
+					name: "Lettres (Jour 2)",
+					taskPreferences: { "Français": 0.9, "Histoire": 0.7, "Art": 0.4 }
+				},
+				{
+					start: 18 * 60,
+					end: 19 * 60 + 30,
+					name: "Sport (Jour 2)",
+					taskPreferences: { "Sport": 0.9, "Pause": 0.5 }
+				}
+			);
+		}
+
+		// Jour 3 (après-demain)
+		/*{
+			let afterTomorrow = new Date(viewDate);
+			afterTomorrow.setDate(afterTomorrow.getDate() + 2);
+			const key = isoDateKey(afterTomorrow);
+			if (!store[key]) store[key] = [];
+
+			store[key].push(
+				{
+					start: 8 * 60,
+					end: 12 * 60,
+					name: "Sciences (Jour 3)",
+					taskPreferences: { "Sciences": 0.9, "Maths": 0.6, "Pause": 0.3 }
+				},
+				{
+					start: 13 * 60 + 30,
+					end: 17 * 60 + 30,
+					name: "Lettres (Jour 3)",
+					taskPreferences: { "Français": 0.9, "Histoire": 0.7, "Art": 0.4 }
+				},
+				{
+					start: 18 * 60,
+					end: 19 * 60 + 30,
+					name: "Sport (Jour 3)",
+					taskPreferences: { "Sport": 0.9, "Pause": 0.5 }
+				}
+			);
+		}*/
+
 	}
+
+
+	renderTaskList();
+	openDay(viewDate);
+	updateFloatingButtonVisibility();
+
 }
 
 
@@ -1713,7 +1740,6 @@ function initTest(kind) {
 
 
 // Initialize
-// initTest(0);
 initTaskTypes();
 initTimes();
 renderTaskList();

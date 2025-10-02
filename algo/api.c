@@ -79,11 +79,9 @@ void readBuffer(const uint8_t* buffer, size_t bufferSize) {
 
 
 __attribute__((used))
-char* apiRunAlgo(const uint8_t* buffer, int bufferSize, float lossOrder, int* outputPositions) {
+int* apiRunAlgo(const uint8_t* buffer, int bufferSize) {
 	readBuffer(buffer, bufferSize);
-	runAlgo(lossOrder);
-	*outputPositions = shared.branchList_size;
-	return (char*)shared.best.list; // size = shared.branchList_size + shared.tasks_len
+	return runAlgo();
 }
 
 
