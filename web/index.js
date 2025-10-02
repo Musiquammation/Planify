@@ -40,9 +40,11 @@ const cancelAlgoBtn = document.getElementById('cancelAlgoBtn');
 
 const completions = new Map();
 
+const DEFAULT_PREFERENCE = 0.5;
+
 let viewDate = new Date();
 viewDate.setHours(0,0,0,0);
-const store = {};
+let store = {};
 const tasks = [];
 let editingTaskIndex = -1;
 let currentEditingSlot = null;
@@ -60,16 +62,48 @@ function canEditData() {
 	return window.isRunningAlgo === false;
 }
 
+
+
+function registerStores() {
+	localStorage.setItem('stores', JSON.stringify(store));
+}
+
+function registerTasks() {
+	localStorage.setItem('tasks', JSON.stringify(tasks));
+}
+
+function registerTypes() {
+	localStorage.setItem('types', JSON.stringify(taskTypes));
+}
+
+function loadData() {
+	taskTypes.length = 0;
+	tasks.length = 0;
+
+	let obj = localStorage.getItem('stores');
+	store = obj ? JSON.parse(obj) : {};
+	
+	obj = localStorage.getItem('tasks');
+	if (obj) {
+		for (let t of JSON.parse(obj)) {
+			tasks.push(t);
+		}
+	}
+
+	obj = localStorage.getItem('types');
+	if (obj) {
+		for (let t of JSON.parse(obj)) {
+			taskTypes.push(t);
+		}
+	}
+}
+
+
+
+
 // Task types
 const taskTypes = [
-	{name: "Maths", color: "#3b82f6"},
-	{name: "Français", color: "#10b981"},
-	{name: "Histoire", color: "#f59e0b"},
-	{name: "Sciences", color: "#8b5cf6"},
-	{name: "Sport", color: "#ef4444"},
-	{name: "Musique", color: "#06b6d4"},
-	{name: "Art", color: "#f97316"},
-	{name: "Pause", color: "#6b7280"}
+	{name: "(default)", color: "#6b7280"}
 ];
 
 function isoDateKey(d){ 
@@ -232,6 +266,8 @@ function saveTask(){
 	
 	renderTaskList();
 	closeTaskEditorFunc();
+
+	registerTasks();
 }
 
 // Delete task
@@ -267,7 +303,6 @@ function deleteTask(){
 		}
 	});
 	
-	console.log(`Tâche "${taskToDelete.name}" supprimée de ${slotsToUpdate.length} slot(s)`);
 	
 	// 3. Mettre à jour l'affichage
 	renderTaskList();
@@ -282,6 +317,7 @@ function deleteTask(){
 	updatePlacementButtonsState();
 	
 	closeTaskEditorFunc();
+	registerTasks();
 }
 
 
@@ -314,7 +350,6 @@ function deleteSlot() {
 	// 2. Supprimer des completions si présent
 	if (completions.has(currentEditingSlot)) {
 		completions.delete(currentEditingSlot);
-		console.log(`Suppression du slot "${slotName}" et de ses tâches assignées`);
 	}
 	
 	// 3. Fermer le menu
@@ -326,6 +361,8 @@ function deleteSlot() {
 	
 	// 5. Mettre à jour l'état des boutons de placement
 	updatePlacementButtonsState();
+
+	registerStores();
 }
 
 function emptySlot() {
@@ -405,7 +442,7 @@ function openSlotMenu(slot){
 	if(!slot.taskPreferences) {
 		slot.taskPreferences = {};
 		taskTypes.forEach(type => {
-			slot.taskPreferences[type.name] = 0.0;
+			slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
 		});
 	}
 	
@@ -499,6 +536,8 @@ function updateSlotInfo(slot) {
 			slot.name = newName;
 			renderGrid();
 		}
+
+		registerStores();
 	}
 	
 	slotNameInput.addEventListener('blur', updateSlotName);
@@ -548,6 +587,8 @@ function updateSlotInfo(slot) {
 			startTimeInput.value = minutesToTime(slot.start);
 			endTimeInput.value = minutesToTime(slot.end);
 		}
+
+		registerStores();
 	}
 	
 	startTimeInput.addEventListener('blur', updateSlotTimes);
@@ -781,12 +822,13 @@ function endDrag(e){
 		slot.taskPreferences = {};
 		slot.name = slot.name || "Créneau"; // Ajouter cette ligne
 		taskTypes.forEach(type => {
-			slot.taskPreferences[type.name] = 0.0;
+			slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
 		});
 		
 		const key = isoDateKey(viewDate);
 		if(!store[key]) store[key] = [];
 		store[key].push(slot);
+		registerStores();
 		renderGrid();
 
 
@@ -987,6 +1029,8 @@ function endSlotDrag(e) {
 		draggedSlot.end = newStartMinute + duration;
 	}
 	
+	registerStores();
+
 	// Re-rendre la grille pour finaliser l'affichage
 	renderGrid();
 	
@@ -1035,6 +1079,8 @@ function moveSlotToNewDateTime(slot, newDate, newStartMinute) {
 	if (!store[newKey]) store[newKey] = [];
 	store[newKey].push(newSlot);
 	
+	registerStores();
+
 	// Si on change de jour, naviguer vers le nouveau jour
 	if (oldKey !== newKey) {
 		openDay(newDate);
@@ -1070,7 +1116,7 @@ function renderTaskTypeGrid(preferences) {
 				<div class="task-type-color" style="background-color: ${type.color}"></div>
 				<div class="task-type-name">${type.name}</div>
 			</div>
-			<input type="range" class="task-type-slider" min="0" max="1" step="0.1" value="${preference}" data-type="${type.name}">
+			<input type="range" class="task-type-slider" min="0" max="1" step="0.05" value="${preference}" data-type="${type.name}">
 			<div class="task-preference-value">${Math.round(preference * 100)}%</div>
 		`;
 		
@@ -1085,6 +1131,7 @@ function renderTaskTypeGrid(preferences) {
 			if(currentEditingSlot) {
 				currentEditingSlot.taskPreferences[type.name] = value;
 				// Mettre à jour la couleur du slot en temps réel
+				registerStores();
 				renderGrid();
 			}
 		});
@@ -1143,6 +1190,7 @@ function updateTaskTypeColor(index, newColor) {
 	taskTypes[index].color = newColor;
 	
 	// Mettre à jour l'affichage
+	registerTypes();
 	renderTaskTypesList();
 	renderTaskList();
 	initTaskTypes();
@@ -1186,6 +1234,10 @@ function updateTaskTypeName(index, newName) {
 			}
 		});
 	});
+
+	registerTypes();
+	registerTasks(); // Car les tâches sont aussi modifiées
+	registerStores(); // Car les slots sont aussi modifiés
 	
 	// Mettre à jour l'affichage
 	renderTaskTypesList();
@@ -1242,6 +1294,21 @@ function deleteTaskType(index) {
 		}
 	}
 	
+	// Nettoyer les completions - retirer les tâches de ce type
+	completions.forEach((taskList, slot) => {
+		// Filtrer les tâches pour retirer celles du type supprimé
+		const filteredTasks = taskList.filter(task => task.type !== typeToDelete.name);
+		
+		if (filteredTasks.length === 0) {
+			// Plus de tâches assignées : supprimer l'entrée de la Map
+			completions.delete(slot);
+		} else if (filteredTasks.length !== taskList.length) {
+			// La liste a changé : vider et remplir avec les tâches filtrées
+			taskList.length = 0;
+			taskList.push(...filteredTasks);
+		}
+	});
+	
 	// Nettoyer les préférences des slots
 	Object.keys(store).forEach(dateKey => {
 		store[dateKey].forEach(slot => {
@@ -1250,6 +1317,10 @@ function deleteTaskType(index) {
 			}
 		});
 	});
+	
+	registerTypes();
+	registerTasks(); // Car des tâches sont supprimées
+	registerStores(); // Car les slots sont modifiés
 	
 	// Mettre à jour l'affichage
 	renderTaskTypesList();
@@ -1261,6 +1332,9 @@ function deleteTaskType(index) {
 	if (currentEditingSlot && slotMenu.classList.contains('open')) {
 		renderTaskTypeGrid(currentEditingSlot.taskPreferences);
 	}
+	
+	// Mettre à jour l'état des boutons de placement
+	updatePlacementButtonsState();
 }
 
 // Add new task type
@@ -1278,11 +1352,15 @@ function addNewTaskType() {
 	Object.keys(store).forEach(dateKey => {
 		store[dateKey].forEach(slot => {
 			if (slot.taskPreferences) {
-				slot.taskPreferences[newType.name] = 0.0;
+				slot.taskPreferences[newType.name] = DEFAULT_PREFERENCE;
 			}
 		});
 	});
 	
+	
+
+	registerTypes();
+	registerStores(); // Car les slots sont modifiés (nouvelles préférences)
 	renderTaskTypesList();
 	initTaskTypes();
 	
@@ -1503,7 +1581,23 @@ addTypeBtn.addEventListener('click', addNewTaskType);
 
 // Ajouter cette fonction pour tester le système de completions
 function initTest(kind=0) {
+	store = {};
+	tasks.length = 0;
+	taskTypes.length = 0;
+
 	if (kind === 0) {
+		taskTypes.length = 0;
+		taskTypes.push(
+			{name: "Maths", color: "#3b82f6"},
+			{name: "Français", color: "#10b981"},
+			{name: "Histoire", color: "#f59e0b"},
+			{name: "Sciences", color: "#8b5cf6"},
+			{name: "Sport", color: "#ef4444"},
+			{name: "Musique", color: "#06b6d4"},
+			{name: "Art", color: "#f97316"},
+			{name: "Pause", color: "#6b7280"}
+		);
+
 		const testTasks = [
 			{name: "t0", duration: 5*15, type: "Maths"},
 			{name: "t1", duration: 4*15, type: "Maths"},
@@ -1573,6 +1667,18 @@ function initTest(kind=0) {
 		
 
 	} else if (kind === 1) {
+		taskTypes.length = 0;
+		taskTypes.push(
+			{name: "Maths", color: "#3b82f6"},
+			{name: "Français", color: "#10b981"},
+			{name: "Histoire", color: "#f59e0b"},
+			{name: "Sciences", color: "#8b5cf6"},
+			{name: "Sport", color: "#ef4444"},
+			{name: "Musique", color: "#06b6d4"},
+			{name: "Art", color: "#f97316"},
+			{name: "Pause", color: "#6b7280"}
+		);
+
 		const testTasks = [
 			// Maths
 			{ name: "Algèbre avancée", duration: 60, type: "Maths" },
@@ -1728,6 +1834,10 @@ function initTest(kind=0) {
 	openDay(viewDate);
 	updateFloatingButtonVisibility();
 
+	registerStores();
+	registerTasks();
+	registerTypes();
+
 }
 
 
@@ -1740,6 +1850,7 @@ function initTest(kind=0) {
 
 
 // Initialize
+loadData();
 initTaskTypes();
 initTimes();
 renderTaskList();
