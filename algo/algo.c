@@ -3,7 +3,6 @@
 #include "Task.h"
 #include "Slot.h"
 #include "shared.h"
-#include "Branch.h"
 
 #include "Array.h"
 
@@ -20,9 +19,12 @@ int* compareOptions_scores;
 int compareOptions(const void* a, const void* b) {
 	int s1 = compareOptions_scores[*(int*)a];
 	int s2 = compareOptions_scores[*(int*)b];
-    if (s2 > s1) return 1;
-    if (s2 < s1) return -1;
-    return 0;
+	if (s2 > s1) return 1;
+	if (s2 < s1) return -1;
+
+	if (a < b) return -1;
+	if (a > b) return 1;
+	return 0;
 }
 
 Layer* newLayers(void) {
@@ -30,17 +32,14 @@ Layer* newLayers(void) {
 	for (int s = 0; s < shared.slots_len; s++) {
 		int* options = malloc(sizeof(int) * shared.tasks_len);
 		int* scores = malloc(sizeof(int) * shared.tasks_len);
-
-		/// TODO: remove this test
-		memset(scores, -1, sizeof(int) * shared.tasks_len);
 		
 		int duration = shared.slots[s].duration;
 
 		// Fill options
 		int count = 0;
-        for (int t = 0; t < shared.tasks_len; t++) {
-            love_t love = shared.slots[s].loveTable[shared.tasks[t].type];
-            if (love > 250)
+		for (int t = 0; t < shared.tasks_len; t++) {
+			love_t love = shared.slots[s].loveTable[shared.tasks[t].type];
+			if (love > 250)
 				continue;
 			
 			int taskDuration = shared.tasks[t].duration;
@@ -50,20 +49,20 @@ Layer* newLayers(void) {
 			options[count] = t;
 			
 			int taskScore = taskDuration * love * shared.tasks[t].level;
-            scores[t] = taskScore;
+			scores[t] = taskScore;
 			
-            count++;
-        }
+			count++;
+		}
 
 		compareOptions_scores = scores;
 		qsort(options, count, sizeof(int), compareOptions);
 
 
-
 		if (count < shared.tasks_len) {
 			options[count] = -1; // finish
 		}
-        
+		
+
 		Layer* layer = &layers[s];
 		layer->options = options;
 		layer->scores = scores;
@@ -86,6 +85,7 @@ void freeLayers(Layer* layers) {
 
 
 int pushLayers(int* usages, const int* ownerUsage, int* layerDurations) {
+
 	Array* conflictLayers = malloc(shared.tasks_len * sizeof(Array)); // types: int to layer
 	Array conflictTasks; // type: int
 	Array_create(&conflictTasks, sizeof(int));
@@ -110,6 +110,7 @@ int pushLayers(int* usages, const int* ownerUsage, int* layerDurations) {
 			
 				
 			int usage = usages[t];
+
 			if (usage == AVAILABLE) {
 				// Consume task
 				realLeftDuration -= optDuration;
@@ -176,9 +177,6 @@ int pushLayers(int* usages, const int* ownerUsage, int* layerDurations) {
 
 
 	while (true) {
-		for (int i = 0; i < shared.tasks_len; i++) {
-		}
-
 		int s = scoreBase + pushLayers(subUsages, usages, subLayerDurations);
 		if (s > bestScore) {
 			bestScore = s;
@@ -251,7 +249,6 @@ int pushLayers(int* usages, const int* ownerUsage, int* layerDurations) {
 
 int* runAlgo(void) {
 	data.units = malloc(sizeof(Unit) * shared.tasks_len);
-
 	for (int i = 0; i < shared.tasks_len; i++) {
 		Unit* u = &data.units[i];
 		const Task* t = &shared.tasks[i];
