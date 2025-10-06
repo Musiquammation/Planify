@@ -38,7 +38,6 @@ void Array_createAllowed(Array* array, size_t size, int allowed);
 void Array_copy(const Array* src, Array* dest);
 void* Array_pushFastArray(Array* array);
 void* Array_pushSafeArray(Array* array);
-void* Array_search(Array* array, const void* data, Array_SortComparator_t* comparator);
 void* Array_binarySearch(const Array* array, const void* data, Array_SortComparator_t* comparator); // Array should be sorted
 void* Array_binaryCompare(Array* array, const void* data, Array_SortComparator_t* comparator); // Array should be sorted
 void* Array_pushSort(Array* array, const void* data, Array_SortComparator_t* comparator); // Array should be sorted

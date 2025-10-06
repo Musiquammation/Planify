@@ -164,7 +164,7 @@ int pushLayers(int* usages, const int* ownerUsage, int* layerDurations) {
 	int* states = calloc(conflictTasks.length, sizeof(int));
 
 
-	int bestScore = (int)-0x80000000;
+	int bestScore = 0x80000000;
 	size_t size = sizeof(int) * shared.slots_len;
 	int* const subLayerDurations = malloc(size);
 	memcpy(subLayerDurations, layerDurations, size);
@@ -251,6 +251,7 @@ int pushLayers(int* usages, const int* ownerUsage, int* layerDurations) {
 
 int* runAlgo(void) {
 	data.units = malloc(sizeof(Unit) * shared.tasks_len);
+
 	for (int i = 0; i < shared.tasks_len; i++) {
 		Unit* u = &data.units[i];
 		const Task* t = &shared.tasks[i];
