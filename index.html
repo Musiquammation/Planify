@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Vue Journalière - Exemple</title>
+  <title>Planify</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="index.css">
 </head>
@@ -82,6 +82,12 @@
       <div class="form-group">
         <label for="taskType">Type</label>
         <select id="taskType"></select>
+      </div>
+      <div class="form-group">
+        <label>Fragmentation</label>
+        <div id="fragmentationContainer">
+          <button class="btn-secondary" id="addFragmentationBtn" style="width: 100%;">Ajouter une fragmentation</button>
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn-secondary" id="cancelTaskBtn">Annuler</button>

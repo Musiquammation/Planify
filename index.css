@@ -497,15 +497,23 @@ button:hover{background:rgba(255,255,255,0.02)}
 	color: #e6eef8;
 	font-size: 14px;
 	font-weight: 600;
-	min-width: 50px;
+	min-width: 80px; /* MODIFIER : augmenter pour le picker */
 	text-align: center;
 	outline: none;
+	cursor: pointer; /* AJOUTER */
 }
 
 .editable-time:focus {
 	border-color: var(--accent);
 	background: rgba(79,70,229,0.1);
 }
+
+/* AJOUTER : Styles pour le color scheme du time picker */
+.editable-time::-webkit-calendar-picker-indicator {
+	filter: invert(1);
+	cursor: pointer;
+}
+
 
 .slot-info-row {
 	display: flex;
@@ -1017,3 +1025,106 @@ button:hover{background:rgba(255,255,255,0.02)}
   100% { transform: rotate(3880deg); }   /* 8 tours pile */
 }
 
+
+
+
+/* Fragment icon in task list */
+.fragment-icon {
+	display: inline-block;
+	background: var(--accent);
+	color: white;
+	font-size: 10px;
+	font-weight: 700;
+	padding: 2px 5px;
+	border-radius: 3px;
+	margin-left: 6px;
+	vertical-align: middle;
+}
+
+/* Fragmentation editor */
+.fragmentation-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.fragment-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: rgba(255,255,255,0.04);
+	padding: 8px;
+	border-radius: 6px;
+}
+
+.fragment-input {
+	background: rgba(255,255,255,0.08);
+	border: 1px solid rgba(255,255,255,0.1);
+	border-radius: 4px;
+	padding: 6px 8px;
+	color: #e6eef8;
+	font-size: 14px;
+	width: 80px;
+	text-align: center;
+}
+
+.fragment-input:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.fragment-delete-btn {
+	background: #dc2626;
+	color: white;
+	border: none;
+	border-radius: 4px;
+	padding: 4px 8px;
+	cursor: pointer;
+	font-size: 16px;
+	line-height: 1;
+	margin-left: auto;
+}
+
+.fragment-sum {
+	padding: 8px;
+	border-radius: 6px;
+	font-weight: 600;
+	text-align: center;
+	margin-top: 4px;
+}
+
+.fragment-sum.valid {
+	background: rgba(16, 185, 129, 0.1);
+	color: #10b981;
+}
+
+.fragment-sum.invalid {
+	background: rgba(239, 68, 68, 0.1);
+	color: #ef4444;
+}
+
+
+
+.task-item.placed {
+	opacity: 0.5;
+	background: rgba(255,255,255,0.02);
+}
+
+.task-item.placed:hover {
+	background: rgba(255,255,255,0.04);
+}
+
+.task-item.placed::after {
+	content: "✓";
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--accent);
+	font-weight: 700;
+	font-size: 16px;
+}
+
+.task-item {
+	position: relative; /* AJOUTER pour le positionnement du ::after */
+}
