@@ -41,6 +41,10 @@ const cancelAlgoBtn = document.getElementById('cancelAlgoBtn');
 const completions = new Map();
 
 const DEFAULT_PREFERENCE = 0.5;
+const DEFAULT_SLOT_COLOR = '#4f46e5';
+const MIN_TASK_DURATION = 10;
+const MIN_FRAGMENT_DURATION = 5;
+
 
 let viewDate = new Date();
 viewDate.setHours(0,0,0,0);
@@ -131,29 +135,36 @@ function formatDuration(minutes) {
 
 // Ajouter cette fonction après les fonctions utilitaires existantes :
 function getSlotColor(slot) {
-	if (!slot.taskPreferences) return '#4f46e5'; // Couleur par défaut (accent)
+	if (!slot.taskPreferences) return DEFAULT_SLOT_COLOR; // Pas de prefs => couleur par défaut
 	
-	let maxScore = 0;
+	const preferenceEntries = Object.entries(slot.taskPreferences);
+	if (preferenceEntries.length === 0) return DEFAULT_SLOT_COLOR;
+
+	let maxScore = -Infinity;
 	let dominantType = null;
-	
+	let isTie = false; // Pour détecter si 2 types ont le même score max
+
 	// Trouver le type avec le score le plus élevé
-	Object.keys(slot.taskPreferences).forEach(typeName => {
-		const score = slot.taskPreferences[typeName];
+	preferenceEntries.forEach(([typeName, score]) => {
 		if (score > maxScore) {
 			maxScore = score;
 			dominantType = typeName;
+			isTie = false; // Nouveau max trouvé
+		} else if (score === maxScore) {
+			isTie = true; // Égalité détectée
 		}
 	});
-	
-	// Si aucun type n'est majoritaire ou si le score max est 0, couleur par défaut
-	if (!dominantType) {
-		return '#4f46e5'; // Couleur par défaut (accent)
+
+	// Si égalité parfaite -> couleur par défaut
+	if (isTie || maxScore <= 0) {
+		return DEFAULT_SLOT_COLOR;
 	}
-	
-	// Trouver la couleur du type dominant
+
+	// Sinon, couleur du type dominant
 	const typeObj = taskTypes.find(type => type.name === dominantType);
-	return typeObj ? typeObj.color : '#4f46e5';
+	return typeObj ? typeObj.color : DEFAULT_SLOT_COLOR;
 }
+
 
 function parseTimeInput(timeStr) {
 	const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
@@ -192,13 +203,32 @@ function initTimes(){
 // Render task list
 function renderTaskList(){
 	taskList.innerHTML = '';
+	
+	// Créer un Set des tâches placées (références uniques)
+	const placedTasksSet = new Set();
+	completions.forEach((expandedTaskList) => {
+		expandedTaskList.forEach(expandedTask => {
+			placedTasksSet.add(expandedTask.reference);
+		});
+	});
+	
 	tasks.forEach((task, index) => {
 		const taskItem = document.createElement('div');
 		taskItem.className = 'task-item';
+		
+		// AJOUTER : Ajouter la classe 'placed' si la tâche est placée
+		if (placedTasksSet.has(task)) {
+			taskItem.classList.add('placed');
+		}
+		
 		const taskTypeObj = taskTypes.find(t => t.name === task.type) || taskTypes[0];
 		taskItem.style.borderLeftColor = taskTypeObj.color;
+		
+		// Icône de fragmentation
+		const fragmentIcon = task.fragmentation ? '<span class="fragment-icon">F</span>' : '';
+		
 		taskItem.innerHTML = `
-			<div class="task-name">${task.name}</div>
+			<div class="task-name">${task.name} ${fragmentIcon}</div>
 			<div class="task-duration">${minutesToTime(task.duration)} (${task.duration} min)</div>
 		`;
 		taskItem.onclick = () => openTaskEditor(index);
@@ -229,6 +259,9 @@ function openTaskEditor(taskIndex = -1){
 		deleteTaskBtn.style.display = 'none';
 	}
 	
+	// AJOUTER : Rendre la fragmentation
+	renderFragmentation();
+	
 	taskEditor.classList.add('open');
 	updateFloatingButtonVisibility();
 }
@@ -243,6 +276,119 @@ function closeTaskEditorFunc(){
 		openTaskPanel();
 	}, 100); // Petit délai pour permettre l'animation
 }
+
+
+function renderFragmentation() {
+	const container = document.getElementById('fragmentationContainer');
+	const currentTask = editingTaskIndex >= 0 ? tasks[editingTaskIndex] : null;
+	const duration = parseInt(taskDuration.value) || 0;
+	
+	if (!currentTask || !currentTask.fragmentation) {
+		container.innerHTML = '<button class="btn-secondary" id="addFragmentationBtn" style="width: 100%;">Ajouter une fragmentation</button>';
+		document.getElementById('addFragmentationBtn').addEventListener('click', createFragmentation);
+		return;
+	}
+	
+	const fragments = currentTask.fragmentation;
+	let html = '<div class="fragmentation-list">';
+	
+	fragments.forEach((frag, index) => {
+		html += `
+			<div class="fragment-item">
+				<span>Partie ${index + 1}:</span>
+				<input type="number" class="fragment-input" data-index="${index}" value="${frag}" min="15" step="15">
+				<span>min</span>
+				<button class="btn-danger fragment-delete-btn" data-index="${index}">×</button>
+			</div>
+		`;
+	});
+	
+	const sum = fragments.reduce((a, b) => a + b, 0);
+	const isValid = sum === duration;
+	
+	html += `
+		<div class="fragment-sum ${isValid ? 'valid' : 'invalid'}">
+			Total: ${sum} min ${isValid ? '✓' : `(doit être ${duration})`}
+		</div>
+		<button class="btn-secondary" id="addFragmentPartBtn" style="width: 100%; margin-top: 8px;">Ajouter une partie</button>
+		<button class="btn-danger" id="removeFragmentationBtn" style="width: 100%; margin-top: 8px;">Supprimer la fragmentation</button>
+	</div>`;
+	
+	container.innerHTML = html;
+	
+	// Event listeners
+	document.querySelectorAll('.fragment-input').forEach(input => {
+		input.addEventListener('change', (e) => updateFragmentValue(parseInt(e.target.dataset.index), parseInt(e.target.value)));
+	});
+	
+	document.querySelectorAll('.fragment-delete-btn').forEach(btn => {
+		btn.addEventListener('click', (e) => deleteFragmentPart(parseInt(e.target.dataset.index)));
+	});
+	
+	document.getElementById('addFragmentPartBtn')?.addEventListener('click', addFragmentPart);
+	document.getElementById('removeFragmentationBtn')?.addEventListener('click', removeFragmentation);
+}
+
+function createFragmentation() {
+	if (!canEditData()) return;
+	if (editingTaskIndex < 0) return;
+	
+	const duration = parseInt(taskDuration.value);
+	if (!duration || duration < MIN_TASK_DURATION) {
+		alert(`La tâche doit durer au moins ${MIN_TASK_DURATION} minutes pour être fragmentée`);
+		return;
+	}
+	
+	const half = Math.floor(duration / 2 / MIN_FRAGMENT_DURATION) * MIN_FRAGMENT_DURATION;
+	const remainder = duration - half;
+	tasks[editingTaskIndex].fragmentation = [half, remainder];
+	
+	renderFragmentation();
+}
+
+function updateFragmentValue(index, value) {
+	if (!canEditData()) return;
+	if (editingTaskIndex < 0 || !tasks[editingTaskIndex].fragmentation) return;
+	
+	if (value < MIN_FRAGMENT_DURATION) value = MIN_FRAGMENT_DURATION;
+	tasks[editingTaskIndex].fragmentation[index] = value;
+	
+	renderFragmentation();
+}
+
+function addFragmentPart() {
+	if (!canEditData()) return;
+	if (editingTaskIndex < 0 || !tasks[editingTaskIndex].fragmentation) return;
+	
+	tasks[editingTaskIndex].fragmentation.push(MIN_FRAGMENT_DURATION);
+	renderFragmentation();
+	registerTasks();
+}
+
+function deleteFragmentPart(index) {
+	if (!canEditData()) return;
+	if (editingTaskIndex < 0 || !tasks[editingTaskIndex].fragmentation) return;
+	if (tasks[editingTaskIndex].fragmentation.length <= 1) {
+		alert('Une fragmentation doit avoir au moins 1 partie');
+		return;
+	}
+	
+	tasks[editingTaskIndex].fragmentation.splice(index, 1);
+	renderFragmentation();
+}
+
+
+function removeFragmentation() {
+	if (!canEditData()) return;
+	if (editingTaskIndex < 0) return;
+	
+	delete tasks[editingTaskIndex].fragmentation;
+	renderFragmentation();
+	renderTaskList();
+}
+
+
+
 // Save task
 function saveTask(){
 	if (!canEditData()) return;
@@ -251,12 +397,56 @@ function saveTask(){
 	const duration = parseInt(taskDuration.value);
 	const type = taskType.value;
 	
-	if(!name || !duration || duration < 15){
+	if(!name || !duration || duration < MIN_FRAGMENT_DURATION){
 		alert('Veuillez remplir tous les champs correctement');
 		return;
 	}
 	
 	const task = {name, duration, type};
+	
+	// Conserver et ajuster la fragmentation si elle existe
+	if(editingTaskIndex >= 0 && tasks[editingTaskIndex].fragmentation){
+		const fragments = [...tasks[editingTaskIndex].fragmentation]; // Copie
+		let sum = fragments.reduce((a, b) => a + b, 0);
+		
+		// Ajustement automatique
+		if (sum < duration) {
+			// Somme inférieure : augmenter le dernier segment
+			const diff = duration - sum;
+			fragments[fragments.length - 1] += diff;
+			task.fragmentation = fragments;
+		} else if (sum > duration) {
+			// Somme supérieure : réduire/supprimer les derniers segments
+			while (sum > duration && fragments.length > 0) {
+				const lastIndex = fragments.length - 1;
+				const excess = sum - duration;
+				
+				if (fragments[lastIndex] > excess) {
+					// On peut réduire le dernier segment
+					fragments[lastIndex] -= excess;
+					
+					// Vérifier que le segment reste >= MIN_FRAGMENT_DURATION min
+					if (fragments[lastIndex] < 15) {
+						fragments.splice(lastIndex, 1);
+					}
+					break;
+				} else {
+					// On doit supprimer le dernier segment
+					sum -= fragments[lastIndex];
+					fragments.splice(lastIndex, 1);
+				}
+			}
+			
+			// Si on n'a plus qu'un seul segment ou aucun, pas de fragmentation
+			if (fragments.length > 1) {
+				task.fragmentation = fragments;
+			}
+			// Sinon on ne met pas de fragmentation (undefined)
+		} else {
+			// Somme correcte
+			task.fragmentation = fragments;
+		}
+	}
 	
 	if(editingTaskIndex >= 0){
 		tasks[editingTaskIndex] = task;
@@ -277,20 +467,19 @@ function deleteTask(){
 	if(editingTaskIndex < 0)
 		return;
 
-
 	const taskToDelete = tasks[editingTaskIndex];
 	
 	// 1. Supprimer la tâche du array tasks
 	tasks.splice(editingTaskIndex, 1);
 	
-	// 2. Nettoyer les completions - parcourir toutes les entrées de la Map
+	// 2. Nettoyer les completions - retirer tous les expandedTasks qui référencent cette tâche
 	const slotsToUpdate = [];
-	completions.forEach((taskList, slot) => {
-		// Filtrer les tâches pour retirer celle supprimée (comparaison par référence d'objet)
-		const filteredTasks = taskList.filter(task => task !== taskToDelete);
+	completions.forEach((expandedTaskList, slot) => {
+		// Filtrer les expandedTasks pour retirer ceux qui référencent la tâche supprimée
+		const filteredTasks = expandedTaskList.filter(expandedTask => expandedTask.reference !== taskToDelete);
 		
 		// Si la liste a changé, marquer le slot pour mise à jour
-		if (filteredTasks.length !== taskList.length) {
+		if (filteredTasks.length !== expandedTaskList.length) {
 			slotsToUpdate.push(slot);
 			
 			if (filteredTasks.length === 0) {
@@ -298,7 +487,8 @@ function deleteTask(){
 				completions.delete(slot);
 			} else {
 				// Mettre à jour avec la liste filtrée
-				completions.set(slot, filteredTasks);
+				expandedTaskList.length = 0;
+				expandedTaskList.push(...filteredTasks);
 			}
 		}
 	});
@@ -306,7 +496,7 @@ function deleteTask(){
 	
 	// 3. Mettre à jour l'affichage
 	renderTaskList();
-	renderGrid(); // Important : re-render pour mettre à jour l'affichage des slots
+	renderGrid();
 	
 	// 4. Mettre à jour le menu du slot si ouvert
 	if (currentEditingSlot && slotMenu.classList.contains('open')) {
@@ -377,6 +567,7 @@ function emptySlot() {
 
 	updateSlotInfo(currentEditingSlot);
 	renderGrid();
+	renderTaskList();
 	updatePlacementButtonsState();
 }
 
@@ -462,7 +653,7 @@ function formatDateForInput(d) {
 function updateSlotInfo(slot) {
 	const duration = slot.end - slot.start;
 	
-	// Récupérer les tâches assignées à ce slot
+	// Récupérer les tâches assignées à ce slot (ce sont des expandedTasks)
 	const assignedTasks = completions.get(slot) || [];
 	
 	let tasksHtml = '';
@@ -471,13 +662,15 @@ function updateSlotInfo(slot) {
 			<div class="assigned-tasks-section">
 				<h4>Tâches assignées</h4>
 				<div class="assigned-tasks-list">
-					${assignedTasks.map((task, index) => {
-						const taskTypeObj = taskTypes.find(t => t.name === task.type);
+					${assignedTasks.map((expandedTask, index) => {
+						const taskTypeObj = taskTypes.find(t => t.name === expandedTask.type);
 						const taskColor = taskTypeObj ? taskTypeObj.color : '#4f46e5';
+						// Trouver l'index de la vraie tâche
+						const realTaskIndex = tasks.indexOf(expandedTask.reference);
 						return `
-							<div class="assigned-task-item" data-task-index="${tasks.indexOf(task)}" style="border-left-color: ${taskColor}">
-								<div class="assigned-task-name">${task.name}</div>
-								<div class="assigned-task-info">${task.type} • ${formatDuration(task.duration)}</div>
+							<div class="assigned-task-item" data-task-index="${realTaskIndex}" style="border-left-color: ${taskColor}">
+								<div class="assigned-task-name">${expandedTask.name}</div>
+								<div class="assigned-task-info">${expandedTask.type} • ${formatDuration(expandedTask.duration)}</div>
 							</div>
 						`;
 					}).join('')}
@@ -497,11 +690,11 @@ function updateSlotInfo(slot) {
 		</div>
 		<div class="slot-info-row">
 			<span class="slot-info-label">Heure début:</span>
-			<input type="text" class="editable-time" id="startTimeInput" value="${minutesToTime(slot.start)}">
+			<input type="time" class="editable-time" id="startTimeInput" value="${minutesToTime(slot.start)}">
 		</div>
 		<div class="slot-info-row">
 			<span class="slot-info-label">Heure fin:</span>
-			<input type="text" class="editable-time" id="endTimeInput" value="${minutesToTime(slot.end)}">
+			<input type="time" class="editable-time" id="endTimeInput" value="${minutesToTime(slot.end)}">
 		</div>
 		<div class="slot-info-row">
 			<span class="slot-info-label">Durée:</span>
@@ -565,7 +758,7 @@ function updateSlotInfo(slot) {
 	
 	slotDateInput.addEventListener('change', updateSlotDate);
 	
-	// Événements pour les heures
+	// Événements pour les heures - utiliser 'change' au lieu de 'blur'
 	const startTimeInput = document.getElementById('startTimeInput');
 	const endTimeInput = document.getElementById('endTimeInput');
 	
@@ -584,6 +777,7 @@ function updateSlotInfo(slot) {
 			
 			renderGrid();
 		} else {
+			// Restaurer les valeurs valides
 			startTimeInput.value = minutesToTime(slot.start);
 			endTimeInput.value = minutesToTime(slot.end);
 		}
@@ -591,21 +785,10 @@ function updateSlotInfo(slot) {
 		registerStores();
 	}
 	
-	startTimeInput.addEventListener('blur', updateSlotTimes);
-	startTimeInput.addEventListener('keypress', (e) => {
-		if (e.key === 'Enter') {
-			e.target.blur();
-		}
-	});
-	
-	endTimeInput.addEventListener('blur', updateSlotTimes);
-	endTimeInput.addEventListener('keypress', (e) => {
-		if (e.key === 'Enter') {
-			e.target.blur();
-		}
-	});
+	// Utiliser 'change' pour les inputs de type time
+	startTimeInput.addEventListener('change', updateSlotTimes);
+	endTimeInput.addEventListener('change', updateSlotTimes);
 }
-
 
 function closeSideMenu(){ 
 	slotMenu.classList.remove('open'); 
@@ -661,14 +844,14 @@ function showCompletions() {
 				tasksContainer = document.createElement('div');
 				tasksContainer.className = 'slot-tasks';
 				
-				// Remplir avec les tâches
-				assignedTasks.forEach(task => {
+				// Remplir avec les tâches (qui peuvent être des fragments)
+				assignedTasks.forEach(expandedTask => {
 					const taskElement = document.createElement('div');
 					taskElement.className = 'slot-task';
-					taskElement.textContent = task.name;
+					taskElement.textContent = expandedTask.name; // Inclut déjà "(i/n)" pour les fragments
 					
 					// Trouver la couleur du type de tâche
-					const taskTypeObj = taskTypes.find(t => t.name === task.type);
+					const taskTypeObj = taskTypes.find(t => t.name === expandedTask.type);
 					if (taskTypeObj) {
 						taskElement.style.backgroundColor = taskTypeObj.color;
 					}
@@ -1295,17 +1478,17 @@ function deleteTaskType(index) {
 	}
 	
 	// Nettoyer les completions - retirer les tâches de ce type
-	completions.forEach((taskList, slot) => {
-		// Filtrer les tâches pour retirer celles du type supprimé
-		const filteredTasks = taskList.filter(task => task.type !== typeToDelete.name);
+	completions.forEach((expandedTaskList, slot) => {
+		// Filtrer les expandedTasks pour retirer celles du type supprimé
+		const filteredTasks = expandedTaskList.filter(expandedTask => expandedTask.type !== typeToDelete.name);
 		
 		if (filteredTasks.length === 0) {
 			// Plus de tâches assignées : supprimer l'entrée de la Map
 			completions.delete(slot);
-		} else if (filteredTasks.length !== taskList.length) {
+		} else if (filteredTasks.length !== expandedTaskList.length) {
 			// La liste a changé : vider et remplir avec les tâches filtrées
-			taskList.length = 0;
-			taskList.push(...filteredTasks);
+			expandedTaskList.length = 0;
+			expandedTaskList.push(...filteredTasks);
 		}
 	});
 	
@@ -1426,6 +1609,7 @@ async function placeTasks() {
 		
 		// Mettre à jour l'affichage
 		renderGrid();
+		renderTaskList();
 		
 		// Cacher le loading
 		algoLoading.style.display = 'none';
@@ -1484,6 +1668,7 @@ removePlacementTasksBtn.addEventListener('click', () => {
 	
 	// Mettre à jour l'affichage
 	renderGrid();
+	renderTaskList();
 	
 	// Mettre à jour le menu du slot si ouvert
 	if (currentEditingSlot && slotMenu.classList.contains('open')) {
@@ -1539,7 +1724,11 @@ closeSettingsPanel.addEventListener('click', e => {
 
 addTypeBtn.addEventListener('click', addNewTaskType);
 
-
+taskDuration.addEventListener('change', () => {
+	if (editingTaskIndex >= 0) {
+		renderFragmentation();
+	}
+});
 
 
 

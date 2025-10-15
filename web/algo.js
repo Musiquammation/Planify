@@ -31,6 +31,30 @@ function runAlgoInWorker(store, tasks, taskTypes) {
 		});
 	});
 
+	const expandedTasks = [];
+	tasks.forEach(task => {
+		if (!task.fragmentation || task.fragmentation.length === 0) {
+			// Without fragmentation
+			expandedTasks.push({
+				...task,
+				reference: task,
+				fragmentation: -1
+			});
+		} else {
+			// With fragmentation
+			const n = task.fragmentation.length;
+			task.fragmentation.forEach((fragmentDuration, i) => {
+				expandedTasks.push({
+					...task,
+					name: `${task.name} (${i + 1}/${n})`,
+					duration: fragmentDuration,
+					reference: task,
+					fragmentation: i
+				});
+			});
+		}
+	});
+
 	return new Promise((resolve, reject) => {
 		window.isRunningAlgo = true;
 		currentReject = reject;
@@ -42,16 +66,16 @@ function runAlgoInWorker(store, tasks, taskTypes) {
 			const { action, result, error } = event.data;
 
 			if (action === "result") {
-				const ouput = new Map();
+				const output = new Map();
 				for (let s = 0; s < result.length; s++) {
-					ouput.set(slots[s], result[s].map(i => tasks[i]));
+					output.set(slots[s], result[s].map(i => expandedTasks[i]));
 				}
 
 				window.isRunningAlgo = false;
 				currentReject = null;
 				worker.terminate();
 				workerInstance = null;
-				resolve(ouput);
+				resolve(output);
 			} else if (action === "error") {
 				window.isRunningAlgo = false;
 				currentReject = null;
@@ -69,9 +93,10 @@ function runAlgoInWorker(store, tasks, taskTypes) {
 			reject(err);
 		};
 
-		worker.postMessage({ action: "runAlgo", store, tasks, taskTypes });
+		worker.postMessage({ action: "runAlgo", store, tasks: expandedTasks, taskTypes });
 	});
 }
+
 
 function stopAlgoInWorker() {
 	if (!window.isRunningAlgo) return;
