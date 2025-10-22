@@ -36,7 +36,10 @@ const removePlacementTasksBtn = document.getElementById('removePlacementTasksBtn
 const algoLoading = document.getElementById('algoLoading');
 const cancelAlgoBtn = document.getElementById('cancelAlgoBtn');
 
-
+const taskBornline = document.getElementById('taskBornline');
+const taskDeadline = document.getElementById('taskDeadline');
+const toggleBornlineBtn = document.getElementById('toggleBornlineBtn');
+const toggleDeadlineBtn = document.getElementById('toggleDeadlineBtn');
 
 const completions = new Map();
 
@@ -204,7 +207,6 @@ function initTimes(){
 function renderTaskList(){
 	taskList.innerHTML = '';
 	
-	// Créer un Set des tâches placées (références uniques)
 	const placedTasksSet = new Set();
 	completions.forEach((expandedTaskList) => {
 		expandedTaskList.forEach(expandedTask => {
@@ -212,11 +214,12 @@ function renderTaskList(){
 		});
 	});
 	
+	const now = new Date();
+	
 	tasks.forEach((task, index) => {
 		const taskItem = document.createElement('div');
 		taskItem.className = 'task-item';
 		
-		// AJOUTER : Ajouter la classe 'placed' si la tâche est placée
 		if (placedTasksSet.has(task)) {
 			taskItem.classList.add('placed');
 		}
@@ -227,9 +230,45 @@ function renderTaskList(){
 		// Icône de fragmentation
 		const fragmentIcon = task.fragmentation ? '<span class="fragment-icon">F</span>' : '';
 		
+		// Indicateurs de dates
+		let dateIndicators = '';
+		
+		if (task.bornline) {
+			const bornlineDate = new Date(task.bornline);
+			if (bornlineDate > now) {
+				const dateStr = bornlineDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+				const timeStr = bornlineDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+				dateIndicators += `<span class="date-indicator bornline-future">📅 ${dateStr} ${timeStr}</span>`;
+			}
+		}
+		
+		if (task.deadline) {
+			const deadlineDate = new Date(task.deadline);
+			const timeUntilDeadline = deadlineDate - now;
+			const daysUntilDeadline = Math.floor(timeUntilDeadline / (1000 * 60 * 60 * 24));
+			
+			const dateStr = deadlineDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+			const timeStr = deadlineDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+			
+			if (timeUntilDeadline < 0) {
+				dateIndicators += `<span class="date-indicator deadline-overdue">⚠️ Échue</span>`;
+			} else if (daysUntilDeadline === 0) {
+				dateIndicators += `<span class="date-indicator deadline-today">⏰ ${timeStr}</span>`;
+			} else if (daysUntilDeadline <= 1) {
+				dateIndicators += `<span class="date-indicator deadline-urgent">🔴 ${dateStr} ${timeStr}</span>`;
+			} else if (daysUntilDeadline <= 3) {
+				dateIndicators += `<span class="date-indicator deadline-soon">🟡 ${dateStr} ${timeStr}</span>`;
+			} else if (daysUntilDeadline <= 7) {
+				dateIndicators += `<span class="date-indicator deadline-normal">🟢 ${dateStr} ${timeStr}</span>`;
+			} else {
+				dateIndicators += `<span class="date-indicator deadline-normal">🟢 ${dateStr} ${timeStr}</span>`;
+			}
+		}
+		
 		taskItem.innerHTML = `
 			<div class="task-name">${task.name} ${fragmentIcon}</div>
 			<div class="task-duration">${minutesToTime(task.duration)} (${task.duration} min)</div>
+			${dateIndicators ? '<div class="task-dates">' + dateIndicators + '</div>' : ''}
 		`;
 		taskItem.onclick = () => openTaskEditor(index);
 		taskList.appendChild(taskItem);
@@ -249,6 +288,47 @@ function openTaskEditor(taskIndex = -1){
 		taskName.value = task.name;
 		taskDuration.value = task.duration;
 		taskType.value = task.type;
+		
+		// Bornline
+		if (task.bornline) {
+			const [date, time] = task.bornline.split('T');
+			taskBornline.value = date;
+			taskBornlineTime.value = time || '00:00';
+			taskBornline.disabled = false;
+			taskBornlineTime.disabled = false;
+			toggleBornlineBtn.textContent = 'Désactiver';
+			toggleBornlineBtn.classList.remove('btn-secondary');
+			toggleBornlineBtn.classList.add('btn-primary');
+		} else {
+			taskBornline.value = '';
+			taskBornlineTime.value = '';
+			taskBornline.disabled = true;
+			taskBornlineTime.disabled = true;
+			toggleBornlineBtn.textContent = 'Activer';
+			toggleBornlineBtn.classList.remove('btn-primary');
+			toggleBornlineBtn.classList.add('btn-secondary');
+		}
+		
+		// Deadline
+		if (task.deadline) {
+			const [date, time] = task.deadline.split('T');
+			taskDeadline.value = date;
+			taskDeadlineTime.value = time || '23:59';
+			taskDeadline.disabled = false;
+			taskDeadlineTime.disabled = false;
+			toggleDeadlineBtn.textContent = 'Désactiver';
+			toggleDeadlineBtn.classList.remove('btn-secondary');
+			toggleDeadlineBtn.classList.add('btn-primary');
+		} else {
+			taskDeadline.value = '';
+			taskDeadlineTime.value = '';
+			taskDeadline.disabled = true;
+			taskDeadlineTime.disabled = true;
+			toggleDeadlineBtn.textContent = 'Activer';
+			toggleDeadlineBtn.classList.remove('btn-primary');
+			toggleDeadlineBtn.classList.add('btn-secondary');
+		}
+		
 		deleteTaskBtn.style.display = 'block';
 	} else {
 		// New task
@@ -256,10 +336,29 @@ function openTaskEditor(taskIndex = -1){
 		taskName.value = '';
 		taskDuration.value = '60';
 		taskType.value = taskTypes[0].name;
+		
+		// Reset bornline
+		taskBornline.value = '';
+		taskBornlineTime.value = '';
+		taskBornline.disabled = true;
+		taskBornlineTime.disabled = true;
+		toggleBornlineBtn.textContent = 'Activer';
+		toggleBornlineBtn.classList.remove('btn-primary');
+		toggleBornlineBtn.classList.add('btn-secondary');
+		
+		// Reset deadline
+		taskDeadline.value = '';
+		taskDeadlineTime.value = '';
+		taskDeadline.disabled = true;
+		taskDeadlineTime.disabled = true;
+		toggleDeadlineBtn.textContent = 'Activer';
+		toggleDeadlineBtn.classList.remove('btn-primary');
+		toggleDeadlineBtn.classList.add('btn-secondary');
+		
 		deleteTaskBtn.style.display = 'none';
 	}
 	
-	// AJOUTER : Rendre la fragmentation
+	// Rendre la fragmentation
 	renderFragmentation();
 	
 	taskEditor.classList.add('open');
@@ -402,48 +501,59 @@ function saveTask(){
 		return;
 	}
 	
-	const task = {name, duration, type};
+	// Récupérer bornline et deadline avec heures
+	let bornline = null;
+	let deadline = null;
+	
+	if (!taskBornline.disabled && taskBornline.value) {
+		const time = taskBornlineTime.value || '00:00';
+		bornline = `${taskBornline.value}T${time}`;
+	}
+	
+	if (!taskDeadline.disabled && taskDeadline.value) {
+		const time = taskDeadlineTime.value || '23:59';
+		deadline = `${taskDeadline.value}T${time}`;
+	}
+	
+	// Validation des dates
+	if (bornline && deadline && bornline >= deadline) {
+		alert('La date de début (bornline) doit être strictement avant la date de fin (deadline)');
+		return;
+	}
+	
+	const task = {name, duration, type, bornline, deadline};
 	
 	// Conserver et ajuster la fragmentation si elle existe
 	if(editingTaskIndex >= 0 && tasks[editingTaskIndex].fragmentation){
-		const fragments = [...tasks[editingTaskIndex].fragmentation]; // Copie
+		const fragments = [...tasks[editingTaskIndex].fragmentation];
 		let sum = fragments.reduce((a, b) => a + b, 0);
 		
-		// Ajustement automatique
 		if (sum < duration) {
-			// Somme inférieure : augmenter le dernier segment
 			const diff = duration - sum;
 			fragments[fragments.length - 1] += diff;
 			task.fragmentation = fragments;
 		} else if (sum > duration) {
-			// Somme supérieure : réduire/supprimer les derniers segments
 			while (sum > duration && fragments.length > 0) {
 				const lastIndex = fragments.length - 1;
 				const excess = sum - duration;
 				
 				if (fragments[lastIndex] > excess) {
-					// On peut réduire le dernier segment
 					fragments[lastIndex] -= excess;
 					
-					// Vérifier que le segment reste >= MIN_FRAGMENT_DURATION min
 					if (fragments[lastIndex] < 15) {
 						fragments.splice(lastIndex, 1);
 					}
 					break;
 				} else {
-					// On doit supprimer le dernier segment
 					sum -= fragments[lastIndex];
 					fragments.splice(lastIndex, 1);
 				}
 			}
 			
-			// Si on n'a plus qu'un seul segment ou aucun, pas de fragmentation
 			if (fragments.length > 1) {
 				task.fragmentation = fragments;
 			}
-			// Sinon on ne met pas de fragmentation (undefined)
 		} else {
-			// Somme correcte
 			task.fragmentation = fragments;
 		}
 	}
@@ -883,6 +993,74 @@ function updatePlacementButtonsState() {
 	}
 }
 
+function renderTaskList(){
+	taskList.innerHTML = '';
+	
+	const placedTasksSet = new Set();
+	completions.forEach((expandedTaskList) => {
+		expandedTaskList.forEach(expandedTask => {
+			placedTasksSet.add(expandedTask.reference);
+		});
+	});
+	
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	
+	tasks.forEach((task, index) => {
+		const taskItem = document.createElement('div');
+		taskItem.className = 'task-item';
+		
+		if (placedTasksSet.has(task)) {
+			taskItem.classList.add('placed');
+		}
+		
+		const taskTypeObj = taskTypes.find(t => t.name === task.type) || taskTypes[0];
+		taskItem.style.borderLeftColor = taskTypeObj.color;
+		
+		// Icône de fragmentation
+		const fragmentIcon = task.fragmentation ? '<span class="fragment-icon">F</span>' : '';
+		
+		// Indicateurs de dates
+		let dateIndicators = '';
+		
+		if (task.bornline) {
+			const bornlineDate = new Date(task.bornline);
+			bornlineDate.setHours(0, 0, 0, 0);
+			if (bornlineDate > today) {
+				dateIndicators += '<span class="date-indicator bornline-future">📅 Début: ' + task.bornline + '</span>';
+			}
+		}
+		
+		if (task.deadline) {
+			const deadlineDate = new Date(task.deadline);
+			deadlineDate.setHours(0, 0, 0, 0);
+			const daysUntilDeadline = Math.floor((deadlineDate - today) / (1000 * 60 * 60 * 24));
+			
+			if (daysUntilDeadline < 0) {
+				dateIndicators += '<span class="date-indicator deadline-overdue">⚠️ Échue</span>';
+			} else if (daysUntilDeadline === 0) {
+				dateIndicators += '<span class="date-indicator deadline-today">⏰ Aujourd\'hui</span>';
+			} else if (daysUntilDeadline <= 1) {
+				dateIndicators += '<span class="date-indicator deadline-urgent">🔴 ' + daysUntilDeadline + 'jour</span>';
+			} else if (daysUntilDeadline <= 3) {
+				dateIndicators += '<span class="date-indicator deadline-soon">🟡 ' + daysUntilDeadline + 'jours</span>';
+			} else if (daysUntilDeadline <= 7) {
+				dateIndicators += '<span class="date-indicator deadline-normal">🟢 ' + daysUntilDeadline + 'jours</span>';
+			} else {
+				dateIndicators += '<span class="date-indicator deadline-normal">🟢 ' + task.deadline + '</span>';
+			}
+		}
+		
+		taskItem.innerHTML = `
+			<div class="task-name">${task.name} ${fragmentIcon}</div>
+			<div class="task-duration">${minutesToTime(task.duration)} (${task.duration} min)</div>
+			${dateIndicators ? '<div class="task-dates">' + dateIndicators + '</div>' : ''}
+		`;
+		taskItem.onclick = () => openTaskEditor(index);
+		taskList.appendChild(taskItem);
+	});
+}
+
 
 // Event listeners
 closeMenu.addEventListener('click', e=>{ e.stopPropagation(); closeSideMenu(); });
@@ -920,6 +1098,56 @@ closeTaskEditor.addEventListener('click', closeTaskEditorFunc);
 cancelTaskBtn.addEventListener('click', closeTaskEditorFunc);
 saveTaskBtn.addEventListener('click', saveTask);
 deleteTaskBtn.addEventListener('click', deleteTask);
+
+// Toggle bornline
+// Toggle bornline
+toggleBornlineBtn.addEventListener('click', () => {
+	if (taskBornline.disabled) {
+		// Activer
+		taskBornline.disabled = false;
+		taskBornlineTime.disabled = false;
+		taskBornline.value = formatDateForInput(new Date());
+		taskBornlineTime.value = '00:00';
+		toggleBornlineBtn.textContent = 'Désactiver';
+		toggleBornlineBtn.classList.remove('btn-secondary');
+		toggleBornlineBtn.classList.add('btn-primary');
+	} else {
+		// Désactiver
+		taskBornline.disabled = true;
+		taskBornlineTime.disabled = true;
+		taskBornline.value = '';
+		taskBornlineTime.value = '';
+		toggleBornlineBtn.textContent = 'Activer';
+		toggleBornlineBtn.classList.remove('btn-primary');
+		toggleBornlineBtn.classList.add('btn-secondary');
+	}
+});
+
+// Toggle deadline
+toggleDeadlineBtn.addEventListener('click', () => {
+	if (taskDeadline.disabled) {
+		// Activer
+		taskDeadline.disabled = false;
+		taskDeadlineTime.disabled = false;
+		// Par défaut : dans 7 jours à 23:59
+		const defaultDeadline = new Date();
+		defaultDeadline.setDate(defaultDeadline.getDate() + 7);
+		taskDeadline.value = formatDateForInput(defaultDeadline);
+		taskDeadlineTime.value = '23:59';
+		toggleDeadlineBtn.textContent = 'Désactiver';
+		toggleDeadlineBtn.classList.remove('btn-secondary');
+		toggleDeadlineBtn.classList.add('btn-primary');
+	} else {
+		// Désactiver
+		taskDeadline.disabled = true;
+		taskDeadlineTime.disabled = true;
+		taskDeadline.value = '';
+		taskDeadlineTime.value = '';
+		toggleDeadlineBtn.textContent = 'Activer';
+		toggleDeadlineBtn.classList.remove('btn-primary');
+		toggleDeadlineBtn.classList.add('btn-secondary');
+	}
+});
 
 // Update task type background color when changed
 // taskType.addEventListener('change', () => {
@@ -2052,3 +2280,5 @@ setTimeout(() => {
 	const targetScroll = 8 * hourHeight; // 8h * hauteur d'une heure
 	calendarWrap.scrollTop = targetScroll;
 }, 100);
+
+
