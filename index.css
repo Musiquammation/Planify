@@ -1128,3 +1128,76 @@ button:hover{background:rgba(255,255,255,0.02)}
 .task-item {
 	position: relative; /* AJOUTER pour le positionnement du ::after */
 }
+
+
+/* Date indicators in task list */
+.task-dates {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+.date-indicator {
+	display: inline-block;
+	font-size: 10px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-weight: 600;
+}
+
+.bornline-future {
+	background: rgba(59, 130, 246, 0.2);
+	color: #60a5fa;
+}
+
+.deadline-overdue {
+	background: rgba(239, 68, 68, 0.2);
+	color: #ef4444;
+}
+
+.deadline-today {
+	background: rgba(251, 146, 60, 0.2);
+	color: #fb923c;
+}
+
+.deadline-urgent {
+	background: rgba(239, 68, 68, 0.15);
+	color: #f87171;
+}
+
+.deadline-soon {
+	background: rgba(251, 191, 36, 0.2);
+	color: #fbbf24;
+}
+
+.deadline-normal {
+	background: rgba(34, 197, 94, 0.2);
+	color: #4ade80;
+}
+
+/* Date inputs in task editor */
+#taskBornline:disabled,
+#taskDeadline:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Date and time inputs in task editor */
+#taskBornline:disabled,
+#taskBornlineTime:disabled,
+#taskDeadline:disabled,
+#taskDeadlineTime:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Time picker styling */
+input[type="time"] {
+	min-width: 100px;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+	filter: invert(1);
+	cursor: pointer;
+}
