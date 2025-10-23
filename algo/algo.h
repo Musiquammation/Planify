@@ -22,14 +22,21 @@ typedef struct {
 	int* scores;
 	int fullDuration;
 	int score;
+	int optionCount;
 } Layer;
 
 
 typedef struct {
 	Unit* units;
 	Layer* layers;
-} data_t;
 
+	int currentOptionCount;
+	int bestCombinScore;
+	char* useCombin;
+	char* useCombinPattern;
+	char* useBestCombin;
+	char* forbiddenList;
+} data_t;
 
 
 extern data_t data;

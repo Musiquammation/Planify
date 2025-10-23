@@ -48,6 +48,7 @@ void readBuffer(const uint8_t* buffer, size_t bufferSize) {
 		int start    = read_int32(buffer, &offset);
 		int duration = read_int32(buffer, &offset);
 
+		slots[i].start = start;
 		slots[i].duration = duration;
 		slots[i].loveTable = calloc(types_len, sizeof(love_t));
 
@@ -61,11 +62,15 @@ void readBuffer(const uint8_t* buffer, size_t bufferSize) {
 	for (int i = 0; i < tasks_len; i++) {
 		int duration  = read_int32(buffer, &offset);
 		int typeIndex = read_int32(buffer, &offset);
+		int bornline  = read_int32(buffer, &offset);
+		int deadline  = read_int32(buffer, &offset);
 
 		tasks[i].duration = duration;
 		tasks[i].type     = typeIndex;
 		tasks[i].name     = NULL; // non transmis dans le buffer
 		tasks[i].level    = 1;    // idem
+		tasks[i].bornline = bornline;
+		tasks[i].deadline = deadline;
 	}
 
 	// mise à jour du shared global

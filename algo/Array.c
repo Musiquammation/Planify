@@ -85,6 +85,15 @@ void* Array_pushInEmpty(Array* array, bool(*isEmpty)(const void*)) {
 }
 
 
+void* Array_search(Array* array, const void* data, Array_SortComparator_t* comparator) {
+	const size_t size = array->size;
+	for (void* ptr = array->data, *end = ptr += array->length * size; ptr != end; ptr++) {
+		if ((*comparator)(ptr, data) == 0)
+			return ptr;
+	}
+
+	return NULL;
+}
 
 
 void* Array_binarySearch(const Array* array, const void* data, Array_SortComparator_t* comparator) {

@@ -11,3 +11,4 @@ void readBuffer(const uint8_t* buffer, size_t bufferSize);
 int* apiRunAlgo(const uint8_t* buffer, int bufferSize);
 
 #endif
+

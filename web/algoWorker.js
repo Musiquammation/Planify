@@ -37,14 +37,14 @@ function toDayNumber(year, month, day) {
 
 function runAlgo(store, tasks, taskTypes) {
 	return new Promise(async (resolve, reject) => {
-		function buildBuffer(slots) {
+		function buildBuffer(slots, zeroDate) {
 			// Calculate total size
 			const headerSize = 3 * 4; // 3 int32
 			const slotsSize = slots.reduce(
 				(acc, slot) => acc + 2 * 4 + taskTypes.length * 1,
 				0
 			);
-			const tasksSize = tasks.length * (2 * 4); // duration + typeIndex
+			const tasksSize = tasks.length * (4 * 4); // duration + typeIndex + bornline + deadline (4 int32)
 	
 			const totalSize = headerSize + slotsSize + tasksSize;
 			const buffer = new ArrayBuffer(totalSize);
@@ -90,12 +90,44 @@ function runAlgo(store, tasks, taskTypes) {
 					throw new Error(`Unknown task type: ${task.type}`);
 				}
 				writeInt(typeIndex);
+				
+				// Bornline (en minutes depuis zeroDate)
+				let bornlineMinutes = -0x80000000; // Valeur par défaut si null
+				if (task.bornline) {
+					const bornlineDate = new Date(task.bornline);
+					const bornlineYear = bornlineDate.getFullYear();
+					const bornlineMonth = bornlineDate.getMonth() + 1;
+					const bornlineDay = bornlineDate.getDate();
+					const bornlineHour = bornlineDate.getHours();
+					const bornlineMinute = bornlineDate.getMinutes();
+					
+					const bornlineDayNumber = toDayNumber(bornlineYear, bornlineMonth, bornlineDay);
+					const bornlineAbsolute = bornlineDayNumber * 24 * 60 + bornlineHour * 60 + bornlineMinute;
+					bornlineMinutes = bornlineAbsolute - zeroDate;
+				}
+				writeInt(bornlineMinutes);
+				
+				// Deadline (en minutes depuis zeroDate)
+				let deadlineMinutes = 0x7fffffff; // Valeur par défaut si null
+				if (task.deadline) {
+					const deadlineDate = new Date(task.deadline);
+					const deadlineYear = deadlineDate.getFullYear();
+					const deadlineMonth = deadlineDate.getMonth() + 1;
+					const deadlineDay = deadlineDate.getDate();
+					const deadlineHour = deadlineDate.getHours();
+					const deadlineMinute = deadlineDate.getMinutes();
+					
+					const deadlineDayNumber = toDayNumber(deadlineYear, deadlineMonth, deadlineDay);
+					const deadlineAbsolute = deadlineDayNumber * 24 * 60 + deadlineHour * 60 + deadlineMinute;
+					deadlineMinutes = deadlineAbsolute - zeroDate;
+				}
+				writeInt(deadlineMinutes);
 			}
 	
 			return buffer;
 		}
 
-		// --- Build input buffer ---
+		// --- Calculer globalMinStart en prenant en compte slots ET tasks ---
 		const slots = [];
 		let globalMinStart = Infinity;
 
@@ -105,6 +137,7 @@ function runAlgo(store, tasks, taskTypes) {
 			new Date().getDate()
 		);
 
+		// Parcourir les slots pour trouver le min
 		Object.keys(store).forEach(dateKey => {
 			const [year, month, day] = dateKey.split("-").map(Number);
 			const dateOffset = toDayNumber(year, month, day);
@@ -119,6 +152,31 @@ function runAlgo(store, tasks, taskTypes) {
 			});
 		});
 
+		// Parcourir les tasks pour trouver la bornline la plus petite
+		tasks.forEach(task => {
+			if (task.bornline) {
+				const bornlineDate = new Date(task.bornline);
+				const bornlineYear = bornlineDate.getFullYear();
+				const bornlineMonth = bornlineDate.getMonth() + 1;
+				const bornlineDay = bornlineDate.getDate();
+				const bornlineHour = bornlineDate.getHours();
+				const bornlineMinute = bornlineDate.getMinutes();
+				
+				const bornlineDayNumber = toDayNumber(bornlineYear, bornlineMonth, bornlineDay);
+				const bornlineAbsolute = bornlineDayNumber * 24 * 60 + bornlineHour * 60 + bornlineMinute;
+				
+				if (bornlineAbsolute < globalMinStart) {
+					globalMinStart = bornlineAbsolute;
+				}
+			}
+		});
+
+		// Si globalMinStart est toujours Infinity, utiliser aujourd'hui à minuit
+		if (globalMinStart === Infinity) {
+			globalMinStart = todayOffset * 24 * 60;
+		}
+
+		// Construire les slots normalisés
 		Object.keys(store).forEach(dateKey => {
 			const [year, month, day] = dateKey.split("-").map(Number);
 			const dateOffset = toDayNumber(year, month, day);
@@ -138,7 +196,7 @@ function runAlgo(store, tasks, taskTypes) {
 		});
 
 
-		const inputBuffer = buildBuffer(slots);
+		const inputBuffer = buildBuffer(slots, globalMinStart);
 		const inputPtr = Module._malloc(inputBuffer.byteLength);
 		Module.HEAPU8.set(new Uint8Array(inputBuffer), inputPtr);
 
