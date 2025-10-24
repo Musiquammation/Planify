@@ -226,7 +226,6 @@ int pushLayers(int* usages, const int* layerDurations) {
 				// Create conflict
 				usages[t] = CONFLICT;
 				easyTaken[t] = -1;
-				data.forbiddenList[t] = 1;
 
 				Array* c = &conflictLayers[t];
 				Array_createAllowed(c, sizeof(int), 2);
@@ -254,12 +253,18 @@ int pushLayers(int* usages, const int* layerDurations) {
 
 	// No conflicts
 	if (conflictTasks.length == 0) {
-
 		free(easyTaken);
 		free(conflictLayers);
 		free(subLayerDurations);
 		return scoreBase;
 	}
+
+	// Add conflicts to forbidden list
+	Array_loop(int, conflictTasks, t) {
+		data.forbiddenList[*t] = 1;
+		printf("%d[%d] ", *t, conflictLayers[*t].length);
+	}
+
 
 	
 	
