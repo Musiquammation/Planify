@@ -40,10 +40,36 @@
     </div>
   </div>
   <div class="side-menu-footer">
+    <button class="btn-primary" id="startExecutionBtn">Démarrer</button>
     <button class="btn-primary" id="emptySlotBtn">Vider</button>
     <button class="btn-danger" id="deleteSlotBtn" style="margin-bottom: 12px;">Supprimer</button>
   </div>
 </div>
+
+  <!-- Execution view -->
+  <div class="execution-view" id="executionView">
+    <button class="close-btn" id="closeExecutionBtn">×</button>
+    <div class="execution-header">
+      <h2 id="executionSlotName">Créneau</h2>
+      <div class="execution-time">
+        <span id="executionSlotTime">--:-- — --:--</span>
+      </div>
+    </div>
+    <div class="execution-content">
+      <div class="current-task-display">
+        <div class="task-counter" id="taskCounter">Tâche 1/1</div>
+        <h3 id="currentTaskName">Aucune tâche</h3>
+        <div class="timer-display" id="timerDisplay">00:00</div>
+      </div>
+      <div class="execution-controls">
+        <button class="btn-secondary" id="pauseBtn">Pause</button>
+        <button class="btn-secondary" id="addTimeBtn">+5 min</button>
+        <button class="btn-primary" id="nextTaskBtn">Tâche suivante</button>
+      </div>
+      <div class="tasks-list" id="executionTasksList">
+      </div>
+    </div>
+  </div>
 
   <!-- Task panel -->
   <div class="task-panel" id="taskPanel">
@@ -105,6 +131,9 @@
 					<button type="button" class="btn-secondary" id="toggleDeadlineBtn" style="padding: 12px 16px; flex-shrink: 0; min-width: fit-content;">Activer</button>
 				</div>
 			</div>
+			<div class="form-group">
+				<button type="button" class="btn-secondary" id="toggleDoneBtn" style="width: 100%;">Marquer comme fait</button>
+			</div>
       <div class="form-actions">
         <button class="btn-secondary" id="cancelTaskBtn">Annuler</button>
         <button class="btn-danger" id="deleteTaskBtn" style="display:none;">Supprimer</button>
@@ -122,6 +151,15 @@
         <h3>Types de tâches</h3>
         <div class="task-type-list" id="taskTypesList"></div>
         <button class="add-type-btn" id="addTypeBtn">Ajouter un type</button>
+      </div>
+    </div>
+    <div class="settings-footer">
+      <div class="import-buttons-container">
+        <button class="import-preset-btn" id="importPresetBtn">Importer</button>
+        <div class="import-menu" id="importMenu">
+          <div class="import-menu-header">Importer une configuration</div>
+          <div class="import-menu-items" id="importMenuItems"></div>
+        </div>
       </div>
     </div>
   </div>

@@ -12,27 +12,41 @@ function runAlgoInWorker(store, tasks, taskTypes) {
 		return Promise.reject(new Error("Already running algo"));
 	}
 
-	// Generate slots
+	const date = new Date();
+
 	const todayOffset = toDayNumber(
-		new Date().getFullYear(),
-		new Date().getMonth() + 1,
-		new Date().getDate()
+		date.getFullYear(),
+		date.getMonth() + 1,
+		date.getDate()
 	);
 
+	const nowMinutes = date.getHours() * 60 + date.getMinutes();
+
 	const slots = [];
+
 	Object.keys(store).forEach(dateKey => {
 		const [year, month, day] = dateKey.split("-").map(Number);
 		const dateOffset = toDayNumber(year, month, day);
+
 		if (dateOffset < todayOffset)
 			return;
-		
+
 		store[dateKey].forEach(slot => {
+			if (dateOffset === todayOffset) {
+				if (slot.start < nowMinutes)
+					return;
+			}
+
 			slots.push(slot);
 		});
 	});
 
+
 	const expandedTasks = [];
 	tasks.forEach(task => {
+		if (task.done)
+			return;
+
 		if (!task.fragmentation || task.fragmentation.length === 0) {
 			// Without fragmentation
 			expandedTasks.push({

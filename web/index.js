@@ -30,16 +30,36 @@ const settingsPanel = document.getElementById('settingsPanel');
 const closeSettingsPanel = document.getElementById('closeSettingsPanel');
 const taskTypesList = document.getElementById('taskTypesList');
 const addTypeBtn = document.getElementById('addTypeBtn');
+const importPresetBtn = document.getElementById('importPresetBtn');
+const importMenu = document.getElementById('importMenu');
+const importMenuItems = document.getElementById('importMenuItems');
 
 const placeTasksBtn = document.getElementById('placeTasksBtn');
 const removePlacementTasksBtn = document.getElementById('removePlacementTasksBtn');
 const algoLoading = document.getElementById('algoLoading');
 const cancelAlgoBtn = document.getElementById('cancelAlgoBtn');
 
+// Execution view elements
+const executionView = document.getElementById('executionView');
+const closeExecutionBtn = document.getElementById('closeExecutionBtn');
+const startExecutionBtn = document.getElementById('startExecutionBtn');
+const executionSlotName = document.getElementById('executionSlotName');
+const executionSlotTime = document.getElementById('executionSlotTime');
+const taskCounter = document.getElementById('taskCounter');
+const currentTaskName = document.getElementById('currentTaskName');
+const timerDisplay = document.getElementById('timerDisplay');
+const pauseBtn = document.getElementById('pauseBtn');
+const addTimeBtn = document.getElementById('addTimeBtn');
+const nextTaskBtn = document.getElementById('nextTaskBtn');
+const executionTasksList = document.getElementById('executionTasksList');
+
 const taskBornline = document.getElementById('taskBornline');
 const taskDeadline = document.getElementById('taskDeadline');
 const toggleBornlineBtn = document.getElementById('toggleBornlineBtn');
 const toggleDeadlineBtn = document.getElementById('toggleDeadlineBtn');
+const toggleDoneBtn = document.getElementById('toggleDoneBtn');
+let taskDoneStatus = false;
+let taskDoneAt = null;
 
 const completions = new Map();
 
@@ -62,6 +82,15 @@ let isDraggingSlot = false;
 let draggedSlot = null;
 let draggedSlotElement = null;
 let slotDragOffset = { x: 0, y: 0 };
+
+// Execution view state
+let executionMode = false;
+let currentExecutingSlot = null;
+let executionTasks = []; // expanded tasks for current slot
+let currentTaskIndex = 0;
+let timerInterval = null;
+let timeRemaining = 0; // in seconds
+let isTimerPaused = false;
 
 
 
@@ -112,6 +141,53 @@ function loadData() {
 const taskTypes = [
 	{name: "(default)", color: "#6b7280"}
 ];
+
+// Importable types presets
+const importableTypes = [
+	{
+		name: "Collège",
+		types: [
+			{name: "Mathématiques", color: "#ef4444"},
+			{name: "Français", color: "#3b82f6"},
+			{name: "Histoire", color: "#f59e0b"},
+			{name: "Anglais", color: "#fde047"},
+			{name: "Espagnol", color: "#22c55e"},
+			{name: "Allemand", color: "#22c55e"},
+			{name: "Physique", color: "#9ca3af"},
+			{name: "SVT", color: "#166534"},
+			{name: "EPS", color: "#8b5cf6"},
+			{name: "Musique", color: "#ec4899"},
+			{name: "Arts plastiques", color: "#ec4899"}
+		]
+	},
+	{
+		name: "Lycée",
+		types: [
+			{name: "Mathématiques", color: "#ef4444"},
+			{name: "Français", color: "#3b82f6"},
+			{name: "Philosophie", color: "#10b981"},
+			{name: "Histoire", color: "#f59e0b"},
+			{name: "Anglais", color: "#fde047"},
+			{name: "Espagnol", color: "#22c55e"},
+			{name: "Allemand", color: "#22c55e"},
+			{name: "Physique", color: "#9ca3af"},
+			{name: "SVT", color: "#166534"},
+			{name: "Autre", color: "#8b5cf6"}
+		]
+	},
+	{
+		name: "Travail",
+		types: [
+			{name: "Réunions", color: "#3b82f6"},
+			{name: "Projets", color: "#ef4444"},
+			{name: "Documentation", color: "#10b981"},
+			{name: "E-mails", color: "#fde047"},
+			{name: "Formation", color: "#8b5cf6"},
+			{name: "Administration", color: "#06b6d4"}
+		]
+	}
+];
+
 
 function isoDateKey(d){ 
 	// Utiliser les valeurs locales au lieu d'UTC pour éviter les décalages de fuseau horaire
@@ -216,9 +292,33 @@ function renderTaskList(){
 	
 	const now = new Date();
 	
+	// Séparer les tâches faites et non faites
+	const undoneTasks = [];
+	const doneTasks = [];
+	
 	tasks.forEach((task, index) => {
+		if (task.done) {
+			doneTasks.push({ task, index });
+		} else {
+			undoneTasks.push({ task, index });
+		}
+	});
+	
+	// Trier les tâches faites par doneAt (plus récentes en premier)
+	doneTasks.sort((a, b) => {
+		const timeA = a.task.doneAt || 0;
+		const timeB = b.task.doneAt || 0;
+		return timeB - timeA;
+	});
+	
+	// Fonction pour créer un élément de tâche
+	const createTaskElement = (task, index) => {
 		const taskItem = document.createElement('div');
 		taskItem.className = 'task-item';
+		
+		if (task.done) {
+			taskItem.classList.add('done');
+		}
 		
 		if (placedTasksSet.has(task)) {
 			taskItem.classList.add('placed');
@@ -271,7 +371,24 @@ function renderTaskList(){
 			${dateIndicators ? '<div class="task-dates">' + dateIndicators + '</div>' : ''}
 		`;
 		taskItem.onclick = () => openTaskEditor(index);
-		taskList.appendChild(taskItem);
+		return taskItem;
+	};
+	
+	// Ajouter les tâches non faites
+	undoneTasks.forEach(({ task, index }) => {
+		taskList.appendChild(createTaskElement(task, index));
+	});
+	
+	// Ajouter le séparateur s'il y a des tâches faites
+	if (doneTasks.length > 0) {
+		const separator = document.createElement('div');
+		separator.className = 'task-separator';
+		taskList.appendChild(separator);
+	}
+	
+	// Ajouter les tâches faites
+	doneTasks.forEach(({ task, index }) => {
+		taskList.appendChild(createTaskElement(task, index));
 	});
 }
 
@@ -330,6 +447,10 @@ function openTaskEditor(taskIndex = -1){
 		}
 		
 		deleteTaskBtn.style.display = 'block';
+		
+		// Mettre à jour les éléments done et doneAt
+		taskDoneStatus = task.done;
+		taskDoneAt = task.done ? task.doneAt : null;
 	} else {
 		// New task
 		taskEditorTitle.textContent = 'Nouvelle tâche';
@@ -356,6 +477,29 @@ function openTaskEditor(taskIndex = -1){
 		toggleDeadlineBtn.classList.add('btn-secondary');
 		
 		deleteTaskBtn.style.display = 'none';
+		
+		// Pour une nouvelle tâche, caché le bouton toggleDone
+		toggleDoneBtn.style.display = 'none';
+		
+		// Mettre à jour les éléments done et doneAt pour nouvelle tâche
+		taskDoneStatus = false;
+		taskDoneAt = null;
+	}
+	
+	// Gestion du bouton toggleDoneBtn pour les tâches existantes
+	if (taskIndex >= 0) {
+		const task = tasks[taskIndex];
+		toggleDoneBtn.style.display = 'block';
+		
+		if (task.done) {
+			toggleDoneBtn.textContent = 'Marquer comme non fait';
+			toggleDoneBtn.classList.remove('btn-secondary');
+			toggleDoneBtn.classList.add('btn-primary');
+		} else {
+			toggleDoneBtn.textContent = 'Marquer comme fait';
+			toggleDoneBtn.classList.remove('btn-primary');
+			toggleDoneBtn.classList.add('btn-secondary');
+		}
 	}
 	
 	// Rendre la fragmentation
@@ -521,7 +665,7 @@ function saveTask(){
 		return;
 	}
 	
-	const task = {name, duration, type, bornline, deadline};
+	const task = {name, duration, type, bornline, deadline, done: taskDoneStatus, doneAt: taskDoneAt};
 	
 	// Conserver et ajuster la fragmentation si elle existe
 	if(editingTaskIndex >= 0 && tasks[editingTaskIndex].fragmentation){
@@ -688,7 +832,8 @@ function updateFloatingButtonVisibility(){
 	const anyMenuOpen = taskPanel.classList.contains('open') || 
 										 taskEditor.classList.contains('open') || 
 										 slotMenu.classList.contains('open') ||
-										 settingsPanel.classList.contains('open');
+										 settingsPanel.classList.contains('open') ||
+										 executionView.classList.contains('open');
 	
 	if(anyMenuOpen){
 		openTaskPannelBtn.classList.add('hidden');
@@ -715,12 +860,25 @@ function renderGrid(){
 		el.style.left='6px'; el.style.right='6px';
 		el.style.cursor='pointer';
 		
-		// Appliquer la couleur basée sur les préférences
-		const slotColor = getSlotColor(slot);
-		el.style.borderLeftColor = slotColor;
-		el.style.background = `linear-gradient(90deg, ${slotColor}16, ${slotColor}08)`;
+		// Appliquer la couleur basée sur les préférences ou marqué comme fait
+		let slotColor = getSlotColor(slot);
+		if (slot.done) {
+			// Slot marked as done - use green color
+			slotColor = '#10b981';
+			el.style.borderLeftColor = slotColor;
+			el.style.background = `linear-gradient(90deg, ${slotColor}30, ${slotColor}18)`;
+			el.style.opacity = '0.7';
+		} else {
+			el.style.borderLeftColor = slotColor;
+			el.style.background = `linear-gradient(90deg, ${slotColor}16, ${slotColor}08)`;
+		}
 		
-		el.innerHTML=`<div class="title">${slot.name || "Créneau"}</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
+		let titleText = slot.name || "Créneau";
+		if (slot.done) {
+			titleText += ' ✓';
+		}
+		
+		el.innerHTML=`<div class="title">${titleText}</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
 
 		// Événements de drag
 		el.addEventListener('mousedown', (e) => startSlotDrag(e, slot, el));
@@ -898,6 +1056,10 @@ function updateSlotInfo(slot) {
 	// Utiliser 'change' pour les inputs de type time
 	startTimeInput.addEventListener('change', updateSlotTimes);
 	endTimeInput.addEventListener('change', updateSlotTimes);
+	
+	// Update "Démarrer" button visibility
+	const hasAssignedTasks = assignedTasks.length > 0 && !slot.done;
+	startExecutionBtn.style.display = hasAssignedTasks ? 'block' : 'none';
 }
 
 function closeSideMenu(){ 
@@ -993,73 +1155,194 @@ function updatePlacementButtonsState() {
 	}
 }
 
-function renderTaskList(){
-	taskList.innerHTML = '';
+
+// ==================== EXECUTION VIEW FUNCTIONS ====================
+
+function startExecution(slot) {
+	// Get tasks assigned to this slot
+	const tasksInSlot = completions.get(slot) || [];
 	
-	const placedTasksSet = new Set();
-	completions.forEach((expandedTaskList) => {
-		expandedTaskList.forEach(expandedTask => {
-			placedTasksSet.add(expandedTask.reference);
-		});
-	});
+	if (tasksInSlot.length === 0) {
+		alert('Aucune tâche assignée à ce créneau');
+		return;
+	}
 	
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
+	// Initialize execution state
+	executionMode = true;
+	currentExecutingSlot = slot;
+	executionTasks = [...tasksInSlot]; // Copy array
+	currentTaskIndex = 0;
+	isTimerPaused = false;
 	
-	tasks.forEach((task, index) => {
-		const taskItem = document.createElement('div');
-		taskItem.className = 'task-item';
-		
-		if (placedTasksSet.has(task)) {
-			taskItem.classList.add('placed');
-		}
-		
-		const taskTypeObj = taskTypes.find(t => t.name === task.type) || taskTypes[0];
-		taskItem.style.borderLeftColor = taskTypeObj.color;
-		
-		// Icône de fragmentation
-		const fragmentIcon = task.fragmentation ? '<span class="fragment-icon">F</span>' : '';
-		
-		// Indicateurs de dates
-		let dateIndicators = '';
-		
-		if (task.bornline) {
-			const bornlineDate = new Date(task.bornline);
-			bornlineDate.setHours(0, 0, 0, 0);
-			if (bornlineDate > today) {
-				dateIndicators += '<span class="date-indicator bornline-future">📅 Début: ' + task.bornline + '</span>';
-			}
-		}
-		
-		if (task.deadline) {
-			const deadlineDate = new Date(task.deadline);
-			deadlineDate.setHours(0, 0, 0, 0);
-			const daysUntilDeadline = Math.floor((deadlineDate - today) / (1000 * 60 * 60 * 24));
+	// Set up UI
+	executionView.classList.add('open');
+	slotMenu.classList.remove('open');
+	updateFloatingButtonVisibility();
+	
+	// Update header
+	executionSlotName.textContent = slot.name || 'Créneau';
+	executionSlotTime.textContent = `${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}`;
+	
+	// Render task list and start first task
+	renderExecutionTasksList();
+	startNextTask();
+}
+
+function startNextTask() {
+	if (currentTaskIndex >= executionTasks.length) {
+		// All tasks done
+		completeExecution();
+		return;
+	}
+	
+	const currentTask = executionTasks[currentTaskIndex];
+	const duration = currentTask.duration || 0;
+	
+	// Update display
+	taskCounter.textContent = `Tâche ${currentTaskIndex + 1}/${executionTasks.length}`;
+	currentTaskName.textContent = currentTask.name || 'Tâche sans nom';
+	
+	// Set timer
+	timeRemaining = duration * 60; // Convert to seconds
+	isTimerPaused = false;
+	pauseBtn.textContent = 'Pause';
+	pauseBtn.classList.remove('paused');
+	
+	// Start timer
+	startTimer();
+	renderExecutionTasksList();
+}
+
+function startTimer() {
+	if (timerInterval) {
+		clearInterval(timerInterval);
+	}
+	
+	timerInterval = setInterval(() => {
+		if (!isTimerPaused) {
+			timeRemaining--;
 			
-			if (daysUntilDeadline < 0) {
-				dateIndicators += '<span class="date-indicator deadline-overdue">⚠️ Échue</span>';
-			} else if (daysUntilDeadline === 0) {
-				dateIndicators += '<span class="date-indicator deadline-today">⏰ Aujourd\'hui</span>';
-			} else if (daysUntilDeadline <= 1) {
-				dateIndicators += '<span class="date-indicator deadline-urgent">🔴 ' + daysUntilDeadline + 'jour</span>';
-			} else if (daysUntilDeadline <= 3) {
-				dateIndicators += '<span class="date-indicator deadline-soon">🟡 ' + daysUntilDeadline + 'jours</span>';
-			} else if (daysUntilDeadline <= 7) {
-				dateIndicators += '<span class="date-indicator deadline-normal">🟢 ' + daysUntilDeadline + 'jours</span>';
-			} else {
-				dateIndicators += '<span class="date-indicator deadline-normal">🟢 ' + task.deadline + '</span>';
+			if (timeRemaining <= 0) {
+				timeRemaining = 0;
+				clearInterval(timerInterval);
+				timerInterval = null;
+				// Auto-move to next task when timer reaches 0
+				moveToNextTask();
 			}
 		}
 		
-		taskItem.innerHTML = `
-			<div class="task-name">${task.name} ${fragmentIcon}</div>
-			<div class="task-duration">${minutesToTime(task.duration)} (${task.duration} min)</div>
-			${dateIndicators ? '<div class="task-dates">' + dateIndicators + '</div>' : ''}
+		updateTimerDisplay();
+	}, 1000);
+	
+	updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+	const minutes = Math.floor(timeRemaining / 60);
+	const seconds = timeRemaining % 60;
+	timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function pauseTimer() {
+	isTimerPaused = !isTimerPaused;
+	
+	if (isTimerPaused) {
+		pauseBtn.textContent = 'Reprendre';
+		pauseBtn.classList.add('paused');
+	} else {
+		pauseBtn.textContent = 'Pause';
+		pauseBtn.classList.remove('paused');
+	}
+}
+
+function addTime() {
+	timeRemaining += 5 * 60; // Add 5 minutes
+	updateTimerDisplay();
+}
+
+function moveToNextTask() {
+	// Mark current task as done
+	const currentTask = executionTasks[currentTaskIndex];
+	if (currentTask.reference && !currentTask.reference.done) {
+		currentTask.reference.done = true;
+		currentTask.reference.doneAt = Date.now();
+	}
+	
+	currentTaskIndex++;
+	
+	// Stop timer
+	if (timerInterval) {
+		clearInterval(timerInterval);
+		timerInterval = null;
+	}
+	
+	startNextTask();
+}
+
+function completeExecution() {
+	// Stop timer
+	if (timerInterval) {
+		clearInterval(timerInterval);
+		timerInterval = null;
+	}
+	
+	// Mark the slot as done
+	if (currentExecutingSlot) {
+		currentExecutingSlot.done = true;
+		currentExecutingSlot.doneAt = Date.now();
+	}
+	
+	// Save data
+	registerTasks();
+	registerStores();
+	
+	// Close execution view
+	closeExecution();
+	
+	// Update UI
+	renderGrid();
+	renderTaskList();
+}
+
+function closeExecution() {
+	executionMode = false;
+	executionView.classList.remove('open');
+	slotMenu.classList.remove('open');
+	currentExecutingSlot = null;
+	executionTasks = [];
+	currentTaskIndex = 0;
+	
+	if (timerInterval) {
+		clearInterval(timerInterval);
+		timerInterval = null;
+	}
+	
+	updateFloatingButtonVisibility();
+}
+
+function renderExecutionTasksList() {
+	executionTasksList.innerHTML = '';
+	
+	executionTasks.forEach((task, index) => {
+		const taskEl = document.createElement('div');
+		taskEl.className = 'execution-task-item';
+		
+		if (index < currentTaskIndex) {
+			taskEl.classList.add('done');
+		} else if (index === currentTaskIndex) {
+			taskEl.classList.add('current');
+		}
+		
+		const duration = task.duration || 0;
+		taskEl.innerHTML = `
+			<div class="execution-task-name">${task.name}</div>
+			<div class="execution-task-duration">${duration} minutes</div>
 		`;
-		taskItem.onclick = () => openTaskEditor(index);
-		taskList.appendChild(taskItem);
+		
+		executionTasksList.appendChild(taskEl);
 	});
 }
+
 
 
 // Event listeners
@@ -1080,7 +1363,30 @@ nextBtn.addEventListener('click',()=>{
 document.getElementById('deleteSlotBtn').addEventListener('click', deleteSlot);
 document.getElementById('emptySlotBtn').addEventListener('click', emptySlot);
 
+// Execution view event listeners
+startExecutionBtn.addEventListener('click', e => {
+	e.stopPropagation();
+	if (currentEditingSlot) {
+		startExecution(currentEditingSlot);
+	}
+});
 
+closeExecutionBtn.addEventListener('click', e => {
+	e.stopPropagation();
+	closeExecution();
+});
+
+pauseBtn.addEventListener('click', () => {
+	pauseTimer();
+});
+
+addTimeBtn.addEventListener('click', () => {
+	addTime();
+});
+
+nextTaskBtn.addEventListener('click', () => {
+	moveToNextTask();
+});
 
 
 openTaskPannelBtn.addEventListener('click', e => {
@@ -1099,7 +1405,6 @@ cancelTaskBtn.addEventListener('click', closeTaskEditorFunc);
 saveTaskBtn.addEventListener('click', saveTask);
 deleteTaskBtn.addEventListener('click', deleteTask);
 
-// Toggle bornline
 // Toggle bornline
 toggleBornlineBtn.addEventListener('click', () => {
 	if (taskBornline.disabled) {
@@ -1147,6 +1452,33 @@ toggleDeadlineBtn.addEventListener('click', () => {
 		toggleDeadlineBtn.classList.remove('btn-primary');
 		toggleDeadlineBtn.classList.add('btn-secondary');
 	}
+});
+
+// Toggle done status
+toggleDoneBtn.addEventListener('click', () => {
+	if (editingTaskIndex < 0) return;
+	
+	const task = tasks[editingTaskIndex];
+	task.done = !task.done;
+	
+	if (task.done) {
+		task.doneAt = Date.now();
+		toggleDoneBtn.textContent = 'Marquer comme non fait';
+		toggleDoneBtn.classList.remove('btn-secondary');
+		toggleDoneBtn.classList.add('btn-primary');
+		taskDoneStatus = true;
+		taskDoneAt = task.doneAt;
+	} else {
+		task.doneAt = null;
+		toggleDoneBtn.textContent = 'Marquer comme fait';
+		toggleDoneBtn.classList.remove('btn-primary');
+		toggleDoneBtn.classList.add('btn-secondary');
+		taskDoneStatus = false;
+		taskDoneAt = null;
+	}
+	
+	registerTasks();
+	renderTaskList();
 });
 
 // Update task type background color when changed
@@ -1785,6 +2117,7 @@ function addNewTaskType() {
 function openSettingsPanel() {
 	settingsPanel.classList.add('open');
 	renderTaskTypesList();
+	initImportMenu();
 	updateFloatingButtonVisibility();
 }
 
@@ -1794,10 +2127,60 @@ function closeSettingsPanelFunc() {
 	updateFloatingButtonVisibility();
 }
 
+// Initialize import menu
+function initImportMenu() {
+	importMenuItems.innerHTML = '';
+	importableTypes.forEach(preset => {
+		const item = document.createElement('button');
+		item.className = 'import-menu-item';
+		item.textContent = preset.name;
+		item.addEventListener('click', () => {
+			importPreset(preset);
+		});
+		importMenuItems.appendChild(item);
+	});
+}
+
+// Import preset configuration
+function importPreset(preset) {
+	// Replace taskTypes with the preset types
+	preset.types.forEach(type => {
+		taskTypes.push({...type});
+	});
+	
+	// Update all tasks to use the first real type (not default)
+	tasks.forEach(task => {
+		task.type = taskTypes[1] ? taskTypes[1].name : "(default)";
+	});
+	
+	// Register changes
+	registerTypes();
+	registerTasks();
+	
+	// Close menu and update display
+	importMenu.classList.remove('open');
+	renderTaskTypesList();
+	renderTaskList();
+	initTaskTypes();
+	
+	alert(`Configuration "${preset.name}" importée avec succès !`);
+}
+
+// Toggle import menu
+function toggleImportMenu() {
+	importMenu.classList.toggle('open');
+}
+
+// Close import menu on outside click
+document.addEventListener('click', e => {
+	if (importMenu.classList.contains('open') && !importMenu.contains(e.target) && e.target !== importPresetBtn) {
+		importMenu.classList.remove('open');
+	}
+});
 
 
 
-
+// Place tasks functionality
 
 // Place tasks functionality
 async function placeTasks() {
@@ -1951,6 +2334,11 @@ closeSettingsPanel.addEventListener('click', e => {
 });
 
 addTypeBtn.addEventListener('click', addNewTaskType);
+
+importPresetBtn.addEventListener('click', e => {
+	e.stopPropagation();
+	toggleImportMenu();
+});
 
 taskDuration.addEventListener('change', () => {
 	if (editingTaskIndex >= 0) {
