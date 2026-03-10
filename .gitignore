@@ -1,2 +1,7 @@
-/emcc
-/draft
+draft
+emcc
+.vscode
+node_modules
+dist
+.env
+output.txt
