@@ -2415,15 +2415,12 @@ function sendUserTrack() {
 		localStorage.setItem('userTrackHash', hash);
 	}
 
-	const ADDRESS = "https://5.51.5.55/planifyUserTracker";
+	const ADDRESS = "https://5.51.5.55:8273/planifyUserTracker";
 
-	fetch(ADDRESS, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json"
-		},
-		body: JSON.stringify({ hash })
-	});
+	navigator.sendBeacon(
+		ADDRESS,
+		JSON.stringify({ hash })
+	);
 }
 
 
