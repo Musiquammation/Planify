@@ -44,5 +44,5 @@ const options = {
 };
 
 https.createServer(options, app).listen(PORT, () => {
-    console.log(`Serveur Planify tracker en HTTPS sur le port ${PORT}`);
+    console.log(`Listening on ${PORT}`);
 });

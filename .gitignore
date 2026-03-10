@@ -5,3 +5,5 @@ node_modules/
 dist/
 .env
 output.txt
+cert.pem
+key.pem
