@@ -137,10 +137,6 @@ function loadData() {
 
 
 
-// Task types
-const taskTypes = [
-	{name: "(default)", color: "#6b7280"}
-];
 
 // Importable types presets
 const importableTypes = [
@@ -187,6 +183,15 @@ const importableTypes = [
 		]
 	}
 ];
+
+const taskTypes = (() => {
+	const obj = importableTypes.find(x => x.name === 'Lycée');
+	if (obj)
+		return obj.types;
+
+	return [{name: "(default)", color: "#6b7280"}];
+})();
+
 
 
 function isoDateKey(d){ 
@@ -2384,6 +2389,52 @@ taskDuration.addEventListener('change', () => {
 
 
 
+
+
+
+
+
+
+
+
+function randomHash16() {
+	const bytes = new Uint8Array(8);
+	crypto.getRandomValues(bytes);
+
+	return [...bytes]
+		.map(b => b.toString(16).padStart(2, "0"))
+		.join("");
+}
+
+
+function sendUserTrack() {
+	let hash = localStorage.getItem('userTrackHash');
+
+	if (hash === null) {
+		hash = randomHash16();
+		localStorage.setItem('userTrackHash', hash);
+	}
+
+	const ADDRESS = "https://5.51.5.55/planifyUserTracker";
+
+	fetch(ADDRESS, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json"
+		},
+		body: JSON.stringify({ hash })
+	});
+}
+
+
+
+
+
+
+
+
+
+
 // Ajouter cette fonction pour tester le système de completions
 function initTest(kind=0) {
 	store = {};
@@ -2670,3 +2721,5 @@ setTimeout(() => {
 }, 100);
 
 
+
+sendUserTrack();
