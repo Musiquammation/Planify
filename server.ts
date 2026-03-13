@@ -27,7 +27,7 @@ app.post("/planifyUserTracker", (req, res) => {
 
     console.log(line);
 
-    fs.appendFile("output.txt", line+"\n", (err) => {
+    fs.appendFile("output.txt", "\n"+line, (err) => {
         if (err) console.error("Erreur écriture fichier:", err);
     });
 
