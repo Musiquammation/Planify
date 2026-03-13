@@ -2419,7 +2419,7 @@ function sendUserTrack() {
 
 	navigator.sendBeacon(
 		ADDRESS,
-		JSON.stringify({ hash })
+		hash
 	);
 }
 
