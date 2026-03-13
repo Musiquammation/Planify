@@ -3,8 +3,9 @@
   "name": "planify",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "server": "node --loader ts-node/esm server.ts"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -19,6 +20,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.4.0",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }
 }

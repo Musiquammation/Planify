@@ -23,11 +23,11 @@ app.post("/planifyUserTracker", (req, res) => {
     else hash = "unknown";
 
 
-    const line = `${Date.now()}\t${hash}\n`;
+    const line = `${Date.now()}\t${hash}`;
 
     console.log(line);
 
-    fs.appendFile("output.txt", line, (err) => {
+    fs.appendFile("output.txt", line+"\n", (err) => {
         if (err) console.error("Erreur écriture fichier:", err);
     });
 
