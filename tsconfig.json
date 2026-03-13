@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "rootDir": "./app",
+    "outDir": "./dist",
+    "module": "esnext",
+    "target": "esnext",
+    "strict": true,
+    "sourceMap": true,
+    "declaration": false,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["app/index.ts"]
+}
