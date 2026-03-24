@@ -46,7 +46,7 @@ async function placeTasks(): Promise<void> {
   const startTime = Date.now();
   const loadingElapsed = algoLoading.querySelector<HTMLElement>('.loading-elapsed')!;
   const timer = setInterval(() => {
-    loadingElapsed.textContent = `Temps écoulé : ${((Date.now() - startTime) / 1000).toFixed(1)}s`;
+    loadingElapsed.textContent = `Elapsed time : ${((Date.now() - startTime) / 1000).toFixed(1)}s`;
   }, 100);
 
   try {

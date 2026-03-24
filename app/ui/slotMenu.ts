@@ -80,7 +80,7 @@ export function updateSlotInfo(slot: Slot): void {
 
 	slotInfo.innerHTML = `
 		<div class="slot-info-row">
-			<span class="slot-info-label">Nom:</span>
+			<span class="slot-info-label">Name:</span>
 			<input type="text" class="editable-name" id="slotNameInput" value="${slot.name ?? 'Slot'}">
 		</div>
 		<div class="slot-info-row">
@@ -88,15 +88,15 @@ export function updateSlotInfo(slot: Slot): void {
 			<input type="date" class="editable-date" id="slotDateInput" value="${formatDateForInput(viewDate)}">
 		</div>
 		<div class="slot-info-row">
-			<span class="slot-info-label">Heure début:</span>
+			<span class="slot-info-label">Start time:</span>
 			<input type="time" class="editable-time" id="startTimeInput" value="${minutesToTime(slot.start)}">
 		</div>
 		<div class="slot-info-row">
-			<span class="slot-info-label">Heure fin:</span>
+			<span class="slot-info-label">End time:</span>
 			<input type="time" class="editable-time" id="endTimeInput" value="${minutesToTime(slot.end)}">
 		</div>
 		<div class="slot-info-row">
-			<span class="slot-info-label">Durée:</span>
+			<span class="slot-info-label">Duration:</span>
 			<span class="duration-display">${formatDuration(duration)}</span>
 		</div>
 		${tasksHtml}

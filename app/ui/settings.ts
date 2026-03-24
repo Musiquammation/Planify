@@ -105,7 +105,7 @@ function updateTaskTypeName(index: number, newName: string): void {
   if (!newName || newName === taskTypes[index].name) return;
 
   if (taskTypes.some((t, i) => i !== index && t.name === newName)) {
-    alert('Ce nom de type existe déjà !');
+    alert("This name already exists");
     renderTaskTypesList();
     return;
   }
@@ -213,7 +213,7 @@ function importPreset(preset: typeof importableTypes[0]): void {
   saveTaskTypes(); saveTasks();
   importMenu.classList.remove('open');
   renderTaskTypesList(); renderTaskList(); initTaskTypes();
-  alert(`Configuration "${preset.name}" importée avec succès !`);
+  alert(`Configuration "${preset.name}" successfully imported!`);
 }
 
 function toggleImportMenu(): void {
@@ -227,7 +227,7 @@ function renderSlotOffsets(): void {
   slotOffsetsList.innerHTML = '';
 
   if (offsets.length === 0) {
-    slotOffsetsList.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:4px 0;">Aucun rappel configuré</div>';
+    slotOffsetsList.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:4px 0;">No reminder set up</div>';
     return;
   }
 
