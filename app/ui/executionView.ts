@@ -27,7 +27,7 @@ let currentTaskIndex = 0;
 export function startExecution(slot: Slot): void {
   const tasksInSlot = completions.get(slot) ?? [];
   if (tasksInSlot.length === 0) {
-    alert('Aucune tâche assignée à ce créneau');
+    alert('No tasks assigned to this slot');
     return;
   }
 
@@ -39,7 +39,7 @@ export function startExecution(slot: Slot): void {
   document.getElementById('sideMenu')!.classList.remove('open');
   updateFloatingButtonVisibility();
 
-  executionSlotName.textContent = slot.name ?? 'Créneau';
+  executionSlotName.textContent = slot.name ?? 'Slot';
   executionSlotTime.textContent = `${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}`;
 
   _renderTasksList();
@@ -65,8 +65,8 @@ function _startNextTask(): void {
   }
 
   const task = executionTasks[currentTaskIndex];
-  taskCounter.textContent   = `Tâche ${currentTaskIndex + 1}/${executionTasks.length}`;
-  currentTaskName.textContent = task.name ?? 'Tâche sans nom';
+  taskCounter.textContent   = `Task ${currentTaskIndex + 1}/${executionTasks.length}`;
+  currentTaskName.textContent = task.name ?? 'Untitled task';
 
   startTimer(task.duration * 60, _moveToNextTask);
   _renderTasksList();

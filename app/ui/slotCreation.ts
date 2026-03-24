@@ -44,7 +44,7 @@ function isOverlapping(slot: { start: number; end: number }): boolean {
 
 function addNewSlot(slot: Slot): void {
   slot.taskPreferences = {};
-  slot.name = slot.name ?? 'Créneau';
+  slot.name = slot.name ?? 'Slot';
   for (const type of taskTypes) {
     slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
   }

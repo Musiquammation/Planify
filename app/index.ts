@@ -11,8 +11,8 @@ import { completions, assignTasksToSlots, clearCompletions } from './state/compl
 import { taskTypes } from './config/taskTypes.js';
 import { isoDateKey } from './utils/date.js';
 
-import { initTimes } from './ui/grid.js';
-import { renderGrid } from './ui/grid.js';
+import { initTimes, renderGrid } from './ui/grid.js';
+import { openTutorial } from './ui/openTutorial.js';
 import { renderTaskList, updatePlacementButtonsState } from './ui/taskPanel.js';
 import { openDay, updateFloatingButtonVisibility, closeSideMenu, closeTaskPanel } from './ui/layout.js';
 import { initTaskTypes } from './ui/taskEditor.js';
@@ -30,6 +30,7 @@ import './ui/executionView.js';
 import './ui/timer.js';
 import './ui/settings.js';
 import './ui/layout.js';
+import { initNotifications } from './ui/notifications.js';
 
 // ─── Algo / placement ──────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ function sendUserTrack(): void {
     crypto.getRandomValues(bytes);
     hash = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
     localStorage.setItem('userTrackHash', hash);
+    openTutorial();
   }
   navigator.sendBeacon('https://5.51.5.55:8273/planifyUserTracker', JSON.stringify({ hash }));
 }
@@ -140,3 +142,4 @@ setTimeout(() => {
 }, 100);
 
 sendUserTrack();
+initNotifications();

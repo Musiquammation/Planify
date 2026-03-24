@@ -12,6 +12,12 @@ import { initTaskTypes } from './taskEditor.js';
 import { openSettingsPanelUI, closeSettingsPanelUI, updateFloatingButtonVisibility } from './layout.js';
 import { canEditData } from '../algo/runAlgo.js';
 import { saveTaskTypes, saveTasks, saveStore } from '../services/storage.js';
+import {
+  loadSlotOffsets, saveSlotOffsets,
+  loadDailyTime,   saveDailyTime,
+  requestPermission, getPermissionStatus,
+  rescheduleSlotReminders, rescheduleDailyReminder,
+} from './notifications.js';
 
 // ─── DOM refs ──────────────────────────────────────────────────────────────
 const settingsPanel    = document.getElementById('settingsPanel')!;
@@ -23,7 +29,34 @@ const importMenuItems  = document.getElementById('importMenuItems')!;
 const closeSettingsBtn = document.getElementById('closeSettingsPanel')!;
 const settingsBtn      = document.getElementById('settingsBtn')!;
 
-// ─── Render ────────────────────────────────────────────────────────────────
+// Notification DOM refs
+const slotOffsetsList       = document.getElementById('slotOffsetsList')!;
+const newOffsetInput        = document.getElementById('newOffsetInput') as HTMLInputElement;
+const addOffsetBtn          = document.getElementById('addOffsetBtn')!;
+const notifPermBanner       = document.getElementById('notifPermissionBanner')!;
+const requestPermBtn        = document.getElementById('requestPermissionBtn')!;
+const dailyReminderToggle   = document.getElementById('dailyReminderToggle') as HTMLInputElement;
+const dailyTimeRow          = document.getElementById('dailyTimeRow')!;
+const dailyTimeInput        = document.getElementById('dailyTimeInput') as HTMLInputElement;
+const notifPermBanner2      = document.getElementById('notifPermissionBanner2')!;
+const requestPermBtn2       = document.getElementById('requestPermissionBtn2')!;
+
+// ─── Collapsible sections ──────────────────────────────────────────────────
+
+function initCollapsibles(): void {
+  document.querySelectorAll<HTMLButtonElement>('.collapsible-header').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const section = btn.closest('.collapsible-section')!;
+      const isOpen  = section.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.collapsible-section').forEach(s => s.classList.remove('open'));
+      // Toggle clicked
+      if (!isOpen) section.classList.add('open');
+    });
+  });
+}
+
+// ─── Task types render ─────────────────────────────────────────────────────
 
 export function renderTaskTypesList(): void {
   taskTypesList.innerHTML = '';
@@ -52,7 +85,7 @@ export function renderTaskTypesList(): void {
   });
 }
 
-// ─── CRUD ──────────────────────────────────────────────────────────────────
+// ─── Task type CRUD ────────────────────────────────────────────────────────
 
 function updateTaskTypeColor(index: number, newColor: string): void {
   if (!canEditData()) return;
@@ -100,7 +133,7 @@ function deleteTaskType(index: number): void {
 
   const tasksWithType = tasks.filter(t => t.type === typeToDelete.name);
   if (tasksWithType.length > 0) {
-    if (!confirm(`Attention ! ${tasksWithType.length} tâche(s) de type "${typeToDelete.name}" seront supprimées.\n\nVoulez-vous continuer ?`)) return;
+    if (!confirm(`Warning! ${tasksWithType.length} task(s) of type "${typeToDelete.name}" will be deleted.\n\nDo you want to continue?`)) return;
   }
 
   const slotsWithOnlyThis: object[] = [];
@@ -114,7 +147,7 @@ function deleteTaskType(index: number): void {
     }
   });
   if (slotsWithOnlyThis.length > 0) {
-    alert(`Impossible de supprimer ce type : ${slotsWithOnlyThis.length} créneau(x) n'auraient plus aucun type avec une préférence > 0%.`);
+    alert(`Cannot remove this kind of slots : ${slotsWithOnlyThis.length} slot(s) would no longer have any type with a preference > 0%.`);
     return;
   }
 
@@ -144,7 +177,7 @@ export function addNewTaskType(): void {
   if (!canEditData()) return;
 
   const newType = {
-    name: `Nouveau type ${taskTypes.length + 1}`,
+    name: `New type ${taskTypes.length + 1}`,
     color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
   };
   taskTypes.push(newType);
@@ -187,13 +220,137 @@ function toggleImportMenu(): void {
   importMenu.classList.toggle('open');
 }
 
-// ─── Event listeners ───────────────────────────────────────────────────────
+// ─── Notification: slot offsets ────────────────────────────────────────────
+
+function renderSlotOffsets(): void {
+  const offsets = loadSlotOffsets();
+  slotOffsetsList.innerHTML = '';
+
+  if (offsets.length === 0) {
+    slotOffsetsList.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:4px 0;">Aucun rappel configuré</div>';
+    return;
+  }
+
+  offsets.forEach(offset => {
+    const item = document.createElement('div');
+    item.className = 'offset-item';
+
+    const label = offset === 0 ? 'At the start of the slot' : `${offset} min before`;
+    item.innerHTML = `
+      <span class="offset-label">${label}</span>
+      <button class="offset-delete-btn" data-offset="${offset}">Supprimer</button>
+    `;
+    item.querySelector<HTMLButtonElement>('.offset-delete-btn')!.addEventListener('click', () => {
+      const current = loadSlotOffsets();
+      saveSlotOffsets(current.filter(o => o !== offset));
+      renderSlotOffsets();
+      rescheduleSlotReminders();
+    });
+    slotOffsetsList.appendChild(item);
+  });
+}
+
+async function _checkAndShowPermBanner(banner: HTMLElement) {
+  const status = await getPermissionStatus();
+  banner.style.display = (status !== 'granted') ? 'flex' : 'none';
+}
+
+async function _handleRequestPermission(banner: HTMLElement): Promise<void> {
+  const granted = await requestPermission();
+  if (granted) {
+    banner.style.display = 'none';
+    rescheduleSlotReminders();
+    rescheduleDailyReminder();
+  } else {
+    alert("Notifications have been denied. Please enable them in your browser settings.");
+  }
+}
+
+// ─── Notification: daily reminder ─────────────────────────────────────────
+
+function renderDailyReminder(): void {
+  const time = loadDailyTime();
+  dailyReminderToggle.checked = !!time;
+  dailyTimeRow.style.display  = time ? 'flex' : 'none';
+  if (time) dailyTimeInput.value = time;
+  _checkAndShowPermBanner(notifPermBanner2);
+}
+
+// ─── Init all notification UI ──────────────────────────────────────────────
+
+function initNotificationUI(): void {
+  renderSlotOffsets();
+  renderDailyReminder();
+  _checkAndShowPermBanner(notifPermBanner);
+  _checkAndShowPermBanner(notifPermBanner2);
+}
+
+// ─── Notification event listeners ─────────────────────────────────────────
+
+addOffsetBtn.addEventListener('click', async () => {
+  const val = parseInt(newOffsetInput.value);
+  if (isNaN(val) || val < 0) { alert('Valeur invalide'); return; }
+
+  const status = await getPermissionStatus();
+  if (status !== 'granted') {
+    const granted = await requestPermission();
+    if (!granted) {
+      _checkAndShowPermBanner(notifPermBanner);
+      return;
+    }
+  }
+
+  const current = loadSlotOffsets();
+  if (!current.includes(val)) {
+    saveSlotOffsets([...current, val]);
+    rescheduleSlotReminders();
+  }
+  newOffsetInput.value = '15';
+  renderSlotOffsets();
+});
+
+requestPermBtn.addEventListener('click', () => _handleRequestPermission(notifPermBanner));
+requestPermBtn2.addEventListener('click', () => _handleRequestPermission(notifPermBanner2));
+
+dailyReminderToggle.addEventListener('change', async () => {
+  if (dailyReminderToggle.checked) {
+    const status = await getPermissionStatus();
+    if (status !== 'granted') {
+      const granted = await requestPermission();
+      if (!granted) {
+        dailyReminderToggle.checked = false;
+        _checkAndShowPermBanner(notifPermBanner2);
+        return;
+      }
+    }
+    const time = dailyTimeInput.value || '08:00';
+    saveDailyTime(time);
+    dailyTimeRow.style.display = 'flex';
+    dailyTimeInput.value = time;
+    rescheduleDailyReminder();
+  } else {
+    saveDailyTime(null);
+    dailyTimeRow.style.display = 'none';
+    rescheduleDailyReminder();
+  }
+  _checkAndShowPermBanner(notifPermBanner2);
+});
+
+dailyTimeInput.addEventListener('change', () => {
+  if (dailyReminderToggle.checked && dailyTimeInput.value) {
+    saveDailyTime(dailyTimeInput.value);
+    rescheduleDailyReminder();
+  }
+});
+
+// ─── Main event listeners ──────────────────────────────────────────────────
 
 settingsBtn.addEventListener('click', e => {
   e.stopPropagation();
   openSettingsPanelUI();
   renderTaskTypesList();
   initImportMenu();
+  initNotificationUI();
 });
 
 closeSettingsBtn.addEventListener('click', e => { e.stopPropagation(); closeSettingsPanelUI(); });
@@ -219,3 +376,6 @@ document.addEventListener('click', e => {
     e.stopPropagation();
   }
 });
+
+// Init collapsibles on module load
+initCollapsibles();

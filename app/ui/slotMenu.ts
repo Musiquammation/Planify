@@ -81,7 +81,7 @@ export function updateSlotInfo(slot: Slot): void {
 	slotInfo.innerHTML = `
 		<div class="slot-info-row">
 			<span class="slot-info-label">Nom:</span>
-			<input type="text" class="editable-name" id="slotNameInput" value="${slot.name ?? 'Créneau'}">
+			<input type="text" class="editable-name" id="slotNameInput" value="${slot.name ?? 'Slot'}">
 		</div>
 		<div class="slot-info-row">
 			<span class="slot-info-label">Date:</span>
