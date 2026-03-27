@@ -32,6 +32,10 @@ import './ui/settings.js';
 import './ui/layout.js';
 import { initNotifications } from './ui/notifications.js';
 
+
+
+const BEACON_ADDRESS = "https://5.51.5.55.sslip.io:8273/planifyUserTracker";
+
 // ─── Algo / placement ──────────────────────────────────────────────────────
 
 const placeTasksBtn           = document.getElementById('placeTasksBtn') as HTMLButtonElement;
@@ -122,7 +126,7 @@ function sendUserTrack(): void {
     localStorage.setItem('userTrackHash', hash);
     openTutorial();
   }
-  navigator.sendBeacon('https://5.51.5.55:8273/planifyUserTracker', JSON.stringify({ hash }));
+  navigator.sendBeacon(BEACON_ADDRESS, hash);
 }
 
 // ─── Bootstrap ─────────────────────────────────────────────────────────────
