@@ -23,6 +23,15 @@ export let isCreatingNewSlot = false;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
+function getDateForLayer(layer: HTMLElement): Date {
+  const col = layer.closest<HTMLElement>('.day-column');
+  if (col?.dataset.dateKey) {
+    const [y, m, d] = col.dataset.dateKey.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(viewDate);
+}
+
 function pageYFromEvt(e: MouseEvent | TouchEvent): number {
   if ('touches' in e && e.touches.length) return e.touches[0].clientY;
   return (e as MouseEvent).clientY;
@@ -42,35 +51,18 @@ function isOverlapping(slot: { start: number; end: number }): boolean {
   return daySlots.some(s => !(slot.end <= s.start || slot.start >= s.end));
 }
 
-function addNewSlot(slot: Slot): void {
+function addNewSlot(slot: Slot, date: Date): void {
   slot.taskPreferences = {};
   slot.name = slot.name ?? 'Slot';
   for (const type of taskTypes) {
     slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
   }
 
-  const key = isoDateKey(viewDate);
+  const key = isoDateKey(date);
   if (!store[key]) store[key] = [];
   store[key].push(slot);
   saveStore();
   renderGrid();
-
-  const slotEls = slotLayer.getElementsByClassName('slot');
-  const newSlotEl = slotEls[slotEls.length - 1] as HTMLElement;
-  newSlotEl.onclick = (ev) => {
-    const slotMenuEl   = document.getElementById('sideMenu')!;
-    const taskPanelEl  = document.getElementById('taskPanel')!;
-    const taskEditorEl = document.getElementById('taskEditor')!;
-    const settingsPanelEl = document.getElementById('settingsPanel')!;
-    if (
-      slotMenuEl.classList.contains('open') ||
-      taskPanelEl.classList.contains('open') ||
-      taskEditorEl.classList.contains('open') ||
-      settingsPanelEl.classList.contains('open')
-    ) return;
-    ev.stopPropagation();
-    openSlotMenu(slot);
-  };
 
   isCreatingNewSlot = true;
   openSlotMenu(slot);
@@ -200,7 +192,9 @@ function endDrag(e: MouseEvent | TouchEvent): void {
     const slot = { start: minute, end: minute + 60, taskPreferences: {} };
 
     if (!isOverlapping(slot)) {
-      addNewSlot(slot as Slot);
+      const targetLayer = (e.target instanceof Element ? e.target.closest('.slot-layer') : null) as HTMLElement | null;
+      const slotDate = targetLayer ? getDateForLayer(targetLayer) : new Date(viewDate);
+      addNewSlot(slot as Slot, slotDate)
     }
   } else {
     const topY    = parseFloat(selectionEl!.style.top) - 6;
@@ -213,7 +207,9 @@ function endDrag(e: MouseEvent | TouchEvent): void {
     const slot = { start: startMin, end: endMin, taskPreferences: {} };
 
     if (!isOverlapping(slot)) {
-      addNewSlot(slot as Slot);
+      const targetLayer = (e.target instanceof Element ? e.target.closest('.slot-layer') : null) as HTMLElement | null;
+      const slotDate = targetLayer ? getDateForLayer(targetLayer) : new Date(viewDate);
+      addNewSlot(slot as Slot, slotDate)
     }
   }
 

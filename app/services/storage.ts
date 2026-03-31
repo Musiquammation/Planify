@@ -16,12 +16,18 @@ export function saveTaskTypes(): void {
   localStorage.setItem('types', JSON.stringify(taskTypes));
 }
 
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
 export function loadData(): void {
   // Tasks
   tasks.length = 0;
   const rawTasks = localStorage.getItem('tasks');
   if (rawTasks) {
     for (const t of JSON.parse(rawTasks) as Task[]) {
+      // Migration: add id if missing
+      if (!t.id) t.id = generateId();
       tasks.push(t);
     }
   }
@@ -38,4 +44,8 @@ export function loadData(): void {
       taskTypes.push(t);
     }
   }
+}
+
+export function generateTaskId(): string {
+  return generateId();
 }

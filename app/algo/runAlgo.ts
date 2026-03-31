@@ -35,7 +35,7 @@ export function runAlgoInWorker(
 
   const date         = new Date();
   const todayOffset  = toDayNumber(date.getFullYear(), date.getMonth() + 1, date.getDate());
-  const nowMinutes   = date.getHours() * 60 + date.getMinutes();
+  const nowMinutes   = 0;
 
   // Collect only future slots
   const futureSlots: Slot[] = [];

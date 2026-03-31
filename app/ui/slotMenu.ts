@@ -21,34 +21,38 @@ const closeMenuBtn     = document.getElementById('closeMenu')!;
 const deleteSlotBtn    = document.getElementById('deleteSlotBtn')!;
 const emptySlotBtn     = document.getElementById('emptySlotBtn')!;
 
+let _editingSlotDate: Date | null = null;
+
 // ─── Open / close ──────────────────────────────────────────────────────────
 
-export function openSlotMenu(slot: Slot): void {
-	const taskPanelEl  = document.getElementById('taskPanel')!;
-	const taskEditorEl = document.getElementById('taskEditor')!;
-	const settingsPanelEl = document.getElementById('settingsPanel')!;
+export function openSlotMenu(slot: Slot, date: Date = viewDate): void {
+  const taskPanelEl     = document.getElementById('taskPanel')!;
+  const taskEditorEl    = document.getElementById('taskEditor')!;
+  const settingsPanelEl = document.getElementById('settingsPanel')!;
 
-	if (
-		slotMenu.classList.contains('open') ||
-		taskPanelEl.classList.contains('open') ||
-		taskEditorEl.classList.contains('open') ||
-		settingsPanelEl.classList.contains('open')
-	) return;
+  if (
+    slotMenu.classList.contains('open') ||
+    taskPanelEl.classList.contains('open') ||
+    taskEditorEl.classList.contains('open') ||
+    settingsPanelEl.classList.contains('open')
+  ) return;
 
-	setCurrentEditingSlot(slot);
+  _editingSlotDate = new Date(date);
+  setCurrentEditingSlot(slot);
 
-	if (!slot.taskPreferences) {
-		slot.taskPreferences = {};
-		for (const type of taskTypes) {
-			slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
-		}
-	}
+  if (!slot.taskPreferences) {
+    slot.taskPreferences = {};
+    for (const type of taskTypes) {
+      slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
+    }
+  }
 
-	updateSlotInfo(slot);
-	renderTaskTypeGrid(slot.taskPreferences);
-	slotMenu.classList.add('open');
-	updateFloatingButtonVisibility();
+  updateSlotInfo(slot);
+  renderTaskTypeGrid(slot.taskPreferences);
+  slotMenu.classList.add('open');
+  updateFloatingButtonVisibility();
 }
+
 
 // ─── Slot info panel ───────────────────────────────────────────────────────
 
@@ -85,7 +89,7 @@ export function updateSlotInfo(slot: Slot): void {
 		</div>
 		<div class="slot-info-row">
 			<span class="slot-info-label">Date:</span>
-			<input type="date" class="editable-date" id="slotDateInput" value="${formatDateForInput(viewDate)}">
+			<input type="date" class="editable-date" id="slotDateInput" value="${formatDateForInput(_editingSlotDate ?? viewDate)}">
 		</div>
 		<div class="slot-info-row">
 			<span class="slot-info-label">Start time:</span>
@@ -134,7 +138,7 @@ export function updateSlotInfo(slot: Slot): void {
 		const newDate = new Date(dateInput.value);
 		if (isNaN(newDate.getTime())) return;
 
-		const oldKey = isoDateKey(viewDate);
+		const oldKey = isoDateKey(_editingSlotDate ?? viewDate);
 		const newKey = isoDateKey(newDate);
 		const { moveSlotToNewDateTime } = await import('../state/store.js');
 		const ok = moveSlotToNewDateTime(slot, oldKey, newKey, slot.start);

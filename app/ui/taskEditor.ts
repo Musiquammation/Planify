@@ -1,5 +1,5 @@
-import { Task } from '../types/models.js';
-import { tasks, editingTaskIndex, setEditingTaskIndex } from '../state/tasks.js';
+import { Task, TaskAfterConstraint } from '../types/models.js';
+import { tasks, editingTaskIndex, setEditingTaskIndex, removeTaskReferences } from '../state/tasks.js';
 import { completions, removeTaskFromCompletions } from '../state/completions.js';
 import { taskTypes } from '../config/taskTypes.js';
 import { MIN_FRAGMENT_DURATION } from '../types/constants.js';
@@ -11,10 +11,9 @@ import { renderTaskList, updatePlacementButtonsState } from './taskPanel.js';
 import { currentEditingSlot } from '../state/store.js';
 import { updateSlotInfo } from './slotMenu.js';
 import { canEditData } from '../algo/runAlgo.js';
-import { saveTasks } from '../services/storage.js';
+import { saveTasks, generateTaskId } from '../services/storage.js';
 import { renderFragmentation } from './taskFragmentation.js';
 
-// ─── DOM refs ──────────────────────────────────────────────────────────────
 const taskEditor      = document.getElementById('taskEditor')!;
 const taskEditorTitle = document.getElementById('taskEditorTitle')!;
 const taskNameInput   = document.getElementById('taskName') as HTMLInputElement;
@@ -34,6 +33,101 @@ const toggleDoneBtn   = document.getElementById('toggleDoneBtn')!;
 
 let taskDoneStatus = false;
 let taskDoneAt: number | null = null;
+
+// ─── After constraints UI ──────────────────────────────────────────────────
+
+function renderAfterConstraints(): void {
+  const container = document.getElementById('afterConstraintsContainer')!;
+  const currentTask = editingTaskIndex >= 0 ? tasks[editingTaskIndex] : null;
+  const constraints = currentTask?.afterConstraints ?? [];
+
+  // Tâches référençables : toutes sauf la tâche en cours d'édition
+  const referenceable = tasks.filter((_, i) => i !== editingTaskIndex);
+
+  if (referenceable.length === 0) {
+    container.innerHTML = '<p style="font-size:12px;color:var(--muted);">Aucune autre tâche disponible.</p>';
+    return;
+  }
+
+  let html = '';
+
+  constraints.forEach((constraint, idx) => {
+    const refTask = tasks.find(t => t.id === constraint.taskId);
+    const days  = Math.floor(constraint.delayMinutes / (60 * 24));
+    const hours = Math.floor((constraint.delayMinutes % (60 * 24)) / 60);
+    const mins  = constraint.delayMinutes % 60;
+
+    html += `
+      <div class="after-constraint-item" data-idx="${idx}" style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:13px;color:var(--muted);flex-shrink:0;">Après :</span>
+          <select class="after-task-select" data-idx="${idx}" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px;color:#e6eef8;font-size:13px;">
+            ${referenceable.map(t => `<option value="${t.id}" ${t.id === constraint.taskId ? 'selected' : ''}>${t.name}</option>`).join('')}
+          </select>
+          <button class="btn-danger after-constraint-delete" data-idx="${idx}" style="padding:4px 10px;font-size:14px;flex-shrink:0;">×</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--muted);">Délai :</span>
+          <input type="number" class="after-delay-days" data-idx="${idx}" value="${days}" min="0" style="width:52px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#e6eef8;font-size:13px;text-align:center;">
+          <span style="font-size:12px;color:var(--muted);">j</span>
+          <input type="number" class="after-delay-hours" data-idx="${idx}" value="${hours}" min="0" max="23" style="width:52px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#e6eef8;font-size:13px;text-align:center;">
+          <span style="font-size:12px;color:var(--muted);">h</span>
+          <input type="number" class="after-delay-mins" data-idx="${idx}" value="${mins}" min="0" max="59" step="5" style="width:52px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:4px 6px;color:#e6eef8;font-size:13px;text-align:center;">
+          <span style="font-size:12px;color:var(--muted);">min</span>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `<button class="btn-secondary" id="addAfterConstraintBtn" style="width:100%;margin-top:4px;">+ Ajouter une dépendance</button>`;
+  container.innerHTML = html;
+
+  // Events
+  container.querySelectorAll<HTMLSelectElement>('.after-task-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const idx = parseInt(sel.dataset.idx!);
+      if (editingTaskIndex >= 0 && tasks[editingTaskIndex].afterConstraints) {
+        tasks[editingTaskIndex].afterConstraints![idx].taskId = sel.value;
+      }
+    });
+  });
+
+  container.querySelectorAll<HTMLInputElement>('.after-delay-days, .after-delay-hours, .after-delay-mins').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = parseInt(inp.dataset.idx!);
+      const row = container.querySelector<HTMLElement>(`.after-constraint-item[data-idx="${idx}"]`)!;
+      const d = parseInt(row.querySelector<HTMLInputElement>('.after-delay-days')!.value) || 0;
+      const h = parseInt(row.querySelector<HTMLInputElement>('.after-delay-hours')!.value) || 0;
+      const m = parseInt(row.querySelector<HTMLInputElement>('.after-delay-mins')!.value) || 0;
+      const total = d * 24 * 60 + h * 60 + m;
+      if (editingTaskIndex >= 0 && tasks[editingTaskIndex].afterConstraints) {
+        tasks[editingTaskIndex].afterConstraints![idx].delayMinutes = total;
+      }
+    });
+  });
+
+  container.querySelectorAll<HTMLButtonElement>('.after-constraint-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx!);
+      if (editingTaskIndex >= 0) {
+        tasks[editingTaskIndex].afterConstraints!.splice(idx, 1);
+        if (tasks[editingTaskIndex].afterConstraints!.length === 0) {
+          delete tasks[editingTaskIndex].afterConstraints;
+        }
+        renderAfterConstraints();
+      }
+    });
+  });
+
+  document.getElementById('addAfterConstraintBtn')?.addEventListener('click', () => {
+    if (editingTaskIndex < 0) return;
+    const ref = referenceable[0];
+    if (!ref) return;
+    if (!tasks[editingTaskIndex].afterConstraints) tasks[editingTaskIndex].afterConstraints = [];
+    tasks[editingTaskIndex].afterConstraints!.push({ taskId: ref.id, delayMinutes: 0 });
+    renderAfterConstraints();
+  });
+}
 
 // ─── Init select ───────────────────────────────────────────────────────────
 
@@ -104,6 +198,7 @@ export function openTaskEditor(taskIndex = -1): void {
   }
 
   renderFragmentation();
+  renderAfterConstraints();
   taskEditor.classList.add('open');
   updateFloatingButtonVisibility();
 }
@@ -143,7 +238,14 @@ export function saveTask(): void {
     return;
   }
 
-  const task: Task = { name, duration, type, bornline, deadline, done: taskDoneStatus, doneAt: taskDoneAt };
+  // Conserver l'id existant ou en générer un nouveau
+  const id = editingTaskIndex >= 0 ? (tasks[editingTaskIndex].id || generateTaskId()) : generateTaskId();
+
+  // Conserver les afterConstraints éditées en live sur l'objet tasks[i]
+  const afterConstraints = editingTaskIndex >= 0 ? tasks[editingTaskIndex].afterConstraints : undefined;
+
+  const task: Task = { id, name, duration, type, bornline, deadline, done: taskDoneStatus, doneAt: taskDoneAt };
+  if (afterConstraints && afterConstraints.length > 0) task.afterConstraints = afterConstraints;
 
   // Carry over and adjust fragmentation
   if (editingTaskIndex >= 0 && tasks[editingTaskIndex].fragmentation) {
@@ -189,6 +291,10 @@ export function deleteTask(): void {
 
   const taskToDelete = tasks[editingTaskIndex];
   tasks.splice(editingTaskIndex, 1);
+
+  // Supprimer les références à cette tâche dans les autres tâches
+  removeTaskReferences(taskToDelete.id);
+
   removeTaskFromCompletions(taskToDelete);
 
   renderTaskList();

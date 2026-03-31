@@ -89,6 +89,7 @@ function cancelAlgo(): void {
 placeTasksBtn.addEventListener('click', placeTasks);
 cancelAlgoBtn.addEventListener('click', cancelAlgo);
 
+
 removePlacementTasksBtn.addEventListener('click', () => {
   if (!canEditData()) return;
   clearCompletions();

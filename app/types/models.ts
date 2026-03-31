@@ -3,7 +3,13 @@ export interface TaskType {
   color: string;
 }
 
+export interface TaskAfterConstraint {
+  taskId: string;
+  delayMinutes: number;
+}
+
 export interface Task {
+  id: string;
   name: string;
   duration: number;        // in minutes
   type: string;            // name of TaskType
@@ -12,6 +18,7 @@ export interface Task {
   done: boolean;
   doneAt: number | null;   // timestamp ms
   fragmentation?: number[]; // fragment durations in minutes
+  afterConstraints?: TaskAfterConstraint[];
 }
 
 export interface Slot {
