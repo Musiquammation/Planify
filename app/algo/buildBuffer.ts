@@ -1,4 +1,4 @@
-import { Task, Slot, TaskType } from '../types/models.js';
+import { Task, Slot, TaskType, SlotStore, ExpandedTask } from '../types/models.js';
 import { toDayNumber } from '../utils/date.js';
 
 export interface NormalizedSlot {
@@ -6,6 +6,60 @@ export interface NormalizedSlot {
   end: number;
   taskPreferences: Record<string, number>;
   dateKey: string;
+}
+
+export function buildBufferArgs(
+  store: SlotStore,
+  tasks: ExpandedTask[]
+) {
+  const today = new Date();
+  const todayOffset = toDayNumber(today.getFullYear(), today.getMonth() + 1, today.getDate());
+
+  // Find global minimum start (earliest slot or bornline)
+  let globalMinStart = Infinity;
+
+  Object.keys(store).forEach(dateKey => {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dateOffset = toDayNumber(y, m, d);
+    if (dateOffset < todayOffset) return;
+    store[dateKey].forEach(slot => {
+      const gs = dateOffset * 24 * 60 + slot.start;
+      if (gs < globalMinStart) globalMinStart = gs;
+    });
+  });
+
+  tasks.forEach(task => {
+    if (task.bornline) {
+      const b = new Date(task.bornline);
+      const dayNum = toDayNumber(b.getFullYear(), b.getMonth() + 1, b.getDate());
+      const abs = dayNum * 24 * 60 + b.getHours() * 60 + b.getMinutes();
+      if (abs < globalMinStart) globalMinStart = abs;
+    }
+  });
+
+  if (!isFinite(globalMinStart)) {
+    globalMinStart = todayOffset * 24 * 60;
+  }
+
+  // Build normalized slots (relative to globalMinStart)
+  const slots: NormalizedSlot[] = [];
+  Object.keys(store).forEach(dateKey => {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dateOffset = toDayNumber(y, m, d);
+    if (dateOffset < todayOffset) return;
+    store[dateKey].forEach(slot => {
+      const gs = dateOffset * 24 * 60 + slot.start;
+      const ge = dateOffset * 24 * 60 + slot.end;
+      slots.push({
+        taskPreferences: slot.taskPreferences,
+        start: gs - globalMinStart,
+        end:   ge - globalMinStart,
+        dateKey,
+      });
+    });
+  });
+
+  return {slots, globalMinStart};
 }
 
 /**

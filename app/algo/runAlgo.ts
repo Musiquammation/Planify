@@ -1,3 +1,4 @@
+import { buildBuffer, buildBufferArgs } from './buildBuffer.js';
 import { Slot, ExpandedTask, SlotStore } from '../types/models.js';
 import { TaskType } from '../types/models.js';
 import { store, viewDate } from '../state/store.js';
@@ -5,101 +6,75 @@ import { tasks, expandTasks } from '../state/tasks.js';
 import { taskTypes } from '../config/taskTypes.js';
 import { toDayNumber, isoDateKey } from '../utils/date.js';
 
-// ─── Running flag ──────────────────────────────────────────────────────────
 
-let _isRunning = false;
-let _workerInstance: Worker | null = null;
-let _currentReject: ((err: Error) => void) | null = null;
+let nextId = 0;
+const pending = new Map<number, (data:any)=>void>();
 
-export function isAlgoRunning(): boolean {
-  return _isRunning;
-}
+const worker = new Worker('./algoWorker.js', { type: 'module' });
 
-/** Guard used throughout the app to prevent edits while algo runs. */
-export function canEditData(): boolean {
-  return !_isRunning;
-}
+worker.onmessage = (e) => {
+  const data = e.data;
+  const fn = pending.get(data.id);
+  if (fn) {
+	fn(data);
+  }
+  pending.delete(data.id);
+};
 
-// ─── Run ───────────────────────────────────────────────────────────────────
 
-/**
- * Expands tasks, filters future slots, posts a message to the worker,
- * and resolves with a Map<Slot, ExpandedTask[]>.
- */
-export function runAlgoInWorker(
-  storeData: SlotStore,
-  taskList: typeof tasks,
-  types: TaskType[],
-): Promise<Map<Slot, ExpandedTask[]>> {
-  if (_isRunning) return Promise.reject(new Error('Already running algo'));
+export async function runAlgoInWorker(
+	storeData: SlotStore,
+	taskList: typeof tasks,
+	types: TaskType[],
+) {
+	const date         = new Date();
+	const todayOffset  = toDayNumber(date.getFullYear(), date.getMonth() + 1, date.getDate());
+	const nowMinutes   = 0;
 
-  const date         = new Date();
-  const todayOffset  = toDayNumber(date.getFullYear(), date.getMonth() + 1, date.getDate());
-  const nowMinutes   = 0;
+	// Collect only future slots
+	const futureSlots: Slot[] = [];
+	Object.keys(storeData).forEach(dateKey => {
+		const [y, m, d]    = dateKey.split('-').map(Number);
+		const dateOffset   = toDayNumber(y, m, d);
+		if (dateOffset < todayOffset) return;
 
-  // Collect only future slots
-  const futureSlots: Slot[] = [];
-  Object.keys(storeData).forEach(dateKey => {
-    const [y, m, d]    = dateKey.split('-').map(Number);
-    const dateOffset   = toDayNumber(y, m, d);
-    if (dateOffset < todayOffset) return;
+		storeData[dateKey].forEach(slot => {
+			if (dateOffset === todayOffset && slot.start < nowMinutes) return;
+			futureSlots.push(slot);
+		});
+	});
 
-    storeData[dateKey].forEach(slot => {
-      if (dateOffset === todayOffset && slot.start < nowMinutes) return;
-      futureSlots.push(slot);
-    });
-  });
+	const expandedTasks = expandTasks(taskList);
+	const {slots, globalMinStart} = buildBufferArgs(store, expandedTasks);
+	const inputBuffer = buildBuffer(slots, tasks, taskTypes, globalMinStart);
 
-  const expandedTasks = expandTasks(taskList);
 
-  return new Promise((resolve, reject) => {
-    _isRunning   = true;
-    _currentReject = reject;
+	const data = await new Promise((resolve: (data: any)=>void) => {
+		const id = nextId++;
+		pending.set(id, resolve);
+		worker.postMessage({
+			id,
+			action: 'runAlgo',
+			inputBuffer,
+			tasks,
+			slots
+		});
+	});
 
-    const worker = new Worker('algoWorker.js');
-    _workerInstance = worker;
 
-    worker.onmessage = (event) => {
-      const { action, result, error } = event.data;
+	const output = new Map<Slot, ExpandedTask[]>();
+	for (let s = 0; s < data.completions.length; s++) {
+		output.set(futureSlots[s], (data.completions[s] as number[]).map(i => expandedTasks[i]));
+	}
 
-      if (action === 'result') {
-        const output = new Map<Slot, ExpandedTask[]>();
-        for (let s = 0; s < result.length; s++) {
-          output.set(futureSlots[s], (result[s] as number[]).map(i => expandedTasks[i]));
-        }
-        _cleanup();
-        worker.terminate();
-        resolve(output);
-      } else if (action === 'error') {
-        _cleanup();
-        worker.terminate();
-        reject(new Error(error));
-      }
-    };
-
-    worker.onerror = (err) => {
-      _cleanup();
-      worker.terminate();
-      reject(err);
-    };
-
-    worker.postMessage({ action: 'runAlgo', store: storeData, tasks: expandedTasks, taskTypes: types });
-  });
+	return output;
 }
 
 export function stopAlgoInWorker(): boolean {
-  if (!_isRunning) return false;
-
-  _workerInstance?.terminate();
-  _workerInstance = null;
-  _currentReject?.(new Error('Stopped'));
-  _currentReject = null;
-  _isRunning = false;
-  return true;
+	return true;
 }
 
-function _cleanup(): void {
-  _isRunning     = false;
-  _currentReject = null;
-  _workerInstance = null;
+
+export function canEditData() {
+	return pending.size === 0;
 }

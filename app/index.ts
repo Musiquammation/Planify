@@ -54,7 +54,6 @@ async function placeTasks(): Promise<void> {
   }, 100);
 
   try {
-    debugger;
     const newCompletions = await runAlgoInWorker(store, tasks, taskTypes);
     clearInterval(timer);
 
@@ -128,7 +127,12 @@ function sendUserTrack(): void {
     localStorage.setItem('userTrackHash', hash);
     openTutorial();
   }
-  navigator.sendBeacon(BEACON_ADDRESS, hash);
+
+  try {
+    navigator.sendBeacon(BEACON_ADDRESS, hash);
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 // ─── Bootstrap ─────────────────────────────────────────────────────────────

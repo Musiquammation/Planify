@@ -4,7 +4,7 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"build": "npx esbuild app/index.ts --bundle --outfile=dist/bundle.js --platform=node --target=esnext && npx esbuild app/worker/algoWorker.ts --bundle --outfile=dist/algoWorker.js --platform=node --target=esnext"
+		"build": "npx esbuild app/index.ts --bundle --outfile=dist/bundle.js --platform=browser --format=esm --target=esnext && npx esbuild app/worker/algoWorker.ts --bundle --outfile=dist/algoWorker.js --platform=browser --format=esm --target=esnext"
 	},
 	"keywords": [],
 	"author": "",
