@@ -72,7 +72,9 @@ function _renderMultiDay(): void {
 
   timesCol.style.display = '';
   gridEl.innerHTML = '';
-  gridEl.style.cssText = 'flex:1;display:flex;overflow:visible;';
+  const timesWidth   = timesCol.offsetWidth || 58;
+  const available    = calendarWrap.clientWidth - timesWidth;
+  const colWidth     = Math.max(160, Math.floor(available / viewDays));
 
   const columnsWrapper = document.createElement('div');
   columnsWrapper.className = 'multiday-columns';
@@ -90,6 +92,9 @@ function _renderMultiDay(): void {
     const col = document.createElement('div');
     col.className = 'day-column';
     col.dataset.dateKey = key;
+    col.style.width     = `${colWidth}px`;
+    col.style.minWidth  = `${colWidth}px`;
+    col.style.flexShrink = '0';
 
     const header = document.createElement('div');
     header.className = 'day-column-header';

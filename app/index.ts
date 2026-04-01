@@ -54,6 +54,7 @@ async function placeTasks(): Promise<void> {
   }, 100);
 
   try {
+    debugger;
     const newCompletions = await runAlgoInWorker(store, tasks, taskTypes);
     clearInterval(timer);
 

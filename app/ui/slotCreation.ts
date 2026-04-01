@@ -5,59 +5,70 @@ import { DEFAULT_PREFERENCE } from '../types/constants.js';
 import { isoDateKey } from '../utils/date.js';
 import { minutesToTime } from '../utils/time.js';
 import { renderGrid } from './grid.js';
-import { openSlotMenu } from './slotMenu.js';
 import { canEditData } from '../algo/runAlgo.js';
 import { saveStore } from '../services/storage.js';
 
 const hourHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hour-height')) || 60;
-const grid       = document.getElementById('grid')!;
-const slotLayer  = document.getElementById('slotLayer')!;
+const calendarWrap = document.querySelector<HTMLElement>('.calendar-wrap')!;
+const gridEl       = document.getElementById('grid')!;
 
 let isDragging   = false;
-let dragStartY   = 0;
-let selectionEl: HTMLElement | null = null;
 let dragStartMin = 0;
+let selectionEl: HTMLElement | null = null;
+let activeLayer: HTMLElement | null = null;
+let activeDate: Date = new Date(viewDate);
 let hasMoved     = false;
 
 export let isCreatingNewSlot = false;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function getDateForLayer(layer: HTMLElement): Date {
-  const col = layer.closest<HTMLElement>('.day-column');
-  if (col?.dataset.dateKey) {
-    const [y, m, d] = col.dataset.dateKey.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }
-  return new Date(viewDate);
-}
-
 function pageYFromEvt(e: MouseEvent | TouchEvent): number {
-  if ('touches' in e && e.touches.length) return e.touches[0].clientY;
-  return (e as MouseEvent).clientY;
+  return 'touches' in e && e.touches.length ? e.touches[0].clientY : (e as MouseEvent).clientY;
 }
 
-function clientRectTop(el: HTMLElement): number {
-  return el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset);
+function pageXFromEvt(e: MouseEvent | TouchEvent): number {
+  return 'touches' in e && e.touches.length ? e.touches[0].clientX : (e as MouseEvent).clientX;
 }
 
-function clamp(v: number, a: number, b: number): number {
-  return Math.max(a, Math.min(b, v));
+function yToMinutes(clientY: number, layer: HTMLElement): number {
+  const rect = layer.getBoundingClientRect();
+  const relY = clientY - rect.top;
+  return Math.max(0, Math.min(24 * 60, Math.floor(relY / hourHeight * 60 / 15) * 15));
 }
 
-function isOverlapping(slot: { start: number; end: number }): boolean {
-  const key = isoDateKey(viewDate);
-  const daySlots = store[key] ?? [];
-  return daySlots.some(s => !(slot.end <= s.start || slot.start >= s.end));
+function getLayerAndDateFromPoint(clientX: number, clientY: number): { layer: HTMLElement; date: Date } | null {
+  // Vue multi-jours : chercher la colonne sous le point
+  const cols = document.querySelectorAll<HTMLElement>('.day-column');
+  if (cols.length > 0) {
+    for (const col of cols) {
+      const rect = col.getBoundingClientRect();
+      if (clientX >= rect.left && clientX <= rect.right) {
+        const layer = col.querySelector<HTMLElement>('.slot-layer');
+        const dateKey = col.dataset.dateKey;
+        if (layer && dateKey) {
+          const [y, m, d] = dateKey.split('-').map(Number);
+          return { layer, date: new Date(y, m - 1, d) };
+        }
+      }
+    }
+  }
+  // Vue 1 jour
+  const layer = document.getElementById('slotLayer');
+  if (layer) return { layer, date: new Date(viewDate) };
+  return null;
+}
+
+function isOverlapping(slot: { start: number; end: number }, dateKey: string): boolean {
+  return (store[dateKey] ?? []).some(s => !(slot.end <= s.start || slot.start >= s.end));
 }
 
 function addNewSlot(slot: Slot, date: Date): void {
   slot.taskPreferences = {};
-  slot.name = slot.name ?? 'Slot';
+  slot.name = 'Slot';
   for (const type of taskTypes) {
     slot.taskPreferences[type.name] = DEFAULT_PREFERENCE;
   }
-
   const key = isoDateKey(date);
   if (!store[key]) store[key] = [];
   store[key].push(slot);
@@ -65,76 +76,74 @@ function addNewSlot(slot: Slot, date: Date): void {
   renderGrid();
 
   isCreatingNewSlot = true;
-  openSlotMenu(slot);
-  setTimeout(() => { isCreatingNewSlot = false; }, 50);
+  import('./slotMenu.js').then(({ openSlotMenu }) => {
+    openSlotMenu(slot, date);
+    setTimeout(() => { isCreatingNewSlot = false; }, 50);
+  });
 }
 
 // ─── Drag handlers ─────────────────────────────────────────────────────────
 
-export function startDrag(e: MouseEvent | TouchEvent): void {
+function startDrag(e: MouseEvent | TouchEvent): void {
   if (!canEditData()) return;
   if ((e as MouseEvent).type === 'mousedown' && (e as MouseEvent).button !== 0) return;
-
-  // Do not start if a slot is being dragged
   if ((window as any)._isDraggingSlot) return;
 
-  const slotMenuEl   = document.getElementById('sideMenu')!;
-  const taskPanelEl  = document.getElementById('taskPanel')!;
-  const taskEditorEl = document.getElementById('taskEditor')!;
-  const settingsPanelEl = document.getElementById('settingsPanel')!;
-
-  if (
-    slotMenuEl.classList.contains('open') ||
-    taskPanelEl.classList.contains('open') ||
-    taskEditorEl.classList.contains('open') ||
-    settingsPanelEl.classList.contains('open')
-  ) return;
+  const panelsOpen = ['sideMenu','taskPanel','taskEditor','settingsPanel']
+    .some(id => document.getElementById(id)!.classList.contains('open'));
+  if (panelsOpen) return;
 
   if ((e.target as HTMLElement).closest('.slot')) return;
+  if ((e.target as HTMLElement).closest('.day-column-header')) return;
 
-  isDragging = true;
-  hasMoved   = false;
 
-  const y   = pageYFromEvt(e);
-  const top = clientRectTop(slotLayer);
-  dragStartY   = clamp(y - top, 0, slotLayer.offsetHeight);
-  dragStartMin = Math.floor(dragStartY / hourHeight * 60 / 15) * 15;
+  const clientX = pageXFromEvt(e);
+  const clientY = pageYFromEvt(e);
+
+  const hit = getLayerAndDateFromPoint(clientX, clientY);
+  if (!hit) return;
+
+  activeLayer = hit.layer;
+  activeDate  = hit.date;
+  isDragging  = true;
+  hasMoved    = false;
+
+  dragStartMin = yToMinutes(clientY, activeLayer);
 
   selectionEl = document.createElement('div');
   selectionEl.className = 'selection';
-  selectionEl.style.top   = `${dragStartMin / 60 * hourHeight + 6}px`;
-  selectionEl.style.height = '28px';
-  selectionEl.style.left  = '6px';
-  selectionEl.style.right = '6px';
-  selectionEl.innerHTML   = `<div style="font-size:12px;padding:4px">${minutesToTime(dragStartMin)} — ${minutesToTime(dragStartMin + 60)}</div>`;
-  slotLayer.appendChild(selectionEl);
+  selectionEl.style.left  = '4px';
+  selectionEl.style.right = '4px';
+  selectionEl.style.top    = `${dragStartMin / 60 * hourHeight}px`;
+  selectionEl.style.height = `${hourHeight}px`;
+  selectionEl.innerHTML = `<div style="font-size:12px;padding:4px">${minutesToTime(dragStartMin)} — ${minutesToTime(dragStartMin + 60)}</div>`;
+  activeLayer.appendChild(selectionEl);
 
   window.addEventListener('mousemove', onDrag as EventListener);
-  window.addEventListener('mouseup', endDrag as EventListener);
+  window.addEventListener('mouseup',   endDrag as EventListener);
   window.addEventListener('touchmove', onDrag as EventListener, { passive: false });
-  window.addEventListener('touchend', endDrag as EventListener);
+  window.addEventListener('touchend',  endDrag as EventListener);
 }
 
 function onDrag(e: MouseEvent | TouchEvent): void {
-  if (!isDragging) return;
+  if (!isDragging || !selectionEl || !activeLayer) return;
 
-  const y    = pageYFromEvt(e);
-  const top  = clientRectTop(slotLayer);
-  const dist = Math.abs(y - (dragStartY + top));
-  if (dist > 5) hasMoved = true;
+  const clientY = pageYFromEvt(e);
+  const curMin  = yToMinutes(clientY, activeLayer);
+
+  // Détecter si on a vraiment bougé (> 1 tranche de 15min)
+  if (Math.abs(curMin - dragStartMin) >= 15) hasMoved = true;
   if (!hasMoved) return;
 
   e.preventDefault();
 
-  const curY    = clamp(y - top, 0, slotLayer.offsetHeight);
-  const topY    = Math.min(dragStartY, curY);
-  const bottomY = Math.max(dragStartY, curY);
-  const startMin = Math.floor(topY   / hourHeight * 60 / 15) * 15;
-  const endMin   = Math.ceil(bottomY / hourHeight * 60 / 15) * 15;
+  const startMin = Math.min(dragStartMin, curMin);
+  const endMin   = Math.max(dragStartMin, curMin);
+  const snappedEnd = Math.max(startMin + 15, endMin);
 
-  selectionEl!.style.top    = `${startMin / 60 * hourHeight + 6}px`;
-  selectionEl!.style.height = `${Math.max(28, (endMin - startMin) / 60 * hourHeight - 6)}px`;
-  selectionEl!.innerHTML    = `<div style="font-size:12px;padding:4px">${minutesToTime(startMin)} — ${minutesToTime(endMin)}</div>`;
+  selectionEl.style.top    = `${startMin / 60 * hourHeight}px`;
+  selectionEl.style.height = `${Math.max(hourHeight / 4, (snappedEnd - startMin) / 60 * hourHeight)}px`;
+  selectionEl.innerHTML    = `<div style="font-size:12px;padding:4px">${minutesToTime(startMin)} — ${minutesToTime(snappedEnd)}</div>`;
 }
 
 function endDrag(e: MouseEvent | TouchEvent): void {
@@ -142,81 +151,56 @@ function endDrag(e: MouseEvent | TouchEvent): void {
   isDragging = false;
 
   window.removeEventListener('mousemove', onDrag as EventListener);
-  window.removeEventListener('mouseup', endDrag as EventListener);
+  window.removeEventListener('mouseup',   endDrag as EventListener);
   window.removeEventListener('touchmove', onDrag as EventListener);
-  window.removeEventListener('touchend', endDrag as EventListener);
+  window.removeEventListener('touchend',  endDrag as EventListener);
 
   e.stopPropagation();
-  e.preventDefault();
 
-  const rect = slotLayer.getBoundingClientRect();
+  const clientY = 'changedTouches' in e && e.changedTouches.length
+    ? e.changedTouches[0].clientY
+    : (e as MouseEvent).clientY;
+  const clientX = 'changedTouches' in e && e.changedTouches.length
+    ? e.changedTouches[0].clientX
+    : (e as MouseEvent).clientX;
 
-  const slotMenuEl   = document.getElementById('sideMenu')!;
-  const taskPanelEl  = document.getElementById('taskPanel')!;
-  const taskEditorEl = document.getElementById('taskEditor')!;
-  const settingsPanelEl = document.getElementById('settingsPanel')!;
-
-  let targetEl: Element | null;
-  if ('changedTouches' in e && e.changedTouches.length) {
-    const touch = e.changedTouches[0];
-    targetEl = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.slot') ?? null;
-  } else {
-    targetEl = (e as MouseEvent).target instanceof Element
-      ? ((e as MouseEvent).target as Element).closest('.slot')
-      : null;
-  }
-
-  if (targetEl) {
-    selectionEl?.remove(); selectionEl = null;
+  // Ignorer si on a relâché sur un slot existant
+  const target = document.elementFromPoint(clientX, clientY);
+  if (target?.closest('.slot')) {
+    selectionEl?.remove(); selectionEl = null; activeLayer = null;
     return;
   }
 
-  if (
-    slotMenuEl.classList.contains('open') ||
-    taskPanelEl.classList.contains('open') ||
-    taskEditorEl.classList.contains('open') ||
-    settingsPanelEl.classList.contains('open')
-  ) {
-    selectionEl?.remove(); selectionEl = null;
+  const panelsOpen = ['sideMenu','taskPanel','taskEditor','settingsPanel']
+    .some(id => document.getElementById(id)!.classList.contains('open'));
+  if (panelsOpen) {
+    selectionEl?.remove(); selectionEl = null; activeLayer = null;
     return;
   }
+
+  if (!activeLayer) { selectionEl?.remove(); selectionEl = null; return; }
+
+  const key = isoDateKey(activeDate);
 
   if (!hasMoved) {
-    let y: number;
-    if ('changedTouches' in e && e.changedTouches.length) y = e.changedTouches[0].clientY;
-    else y = (e as MouseEvent).clientY;
-    y -= rect.top;
-
-    let minute = Math.floor(y / hourHeight * 60 / 15) * 15;
-    minute = clamp(minute, 0, 24 * 60 - 60);
-    const slot = { start: minute, end: minute + 60, taskPreferences: {} };
-
-    if (!isOverlapping(slot)) {
-      const targetLayer = (e.target instanceof Element ? e.target.closest('.slot-layer') : null) as HTMLElement | null;
-      const slotDate = targetLayer ? getDateForLayer(targetLayer) : new Date(viewDate);
-      addNewSlot(slot as Slot, slotDate)
-    }
+    // Clic simple → créneau d'1h à la position exacte du clic
+    const minute = yToMinutes(clientY, activeLayer);
+    const clamped = Math.min(minute, 24 * 60 - 60);
+    const slot = { start: clamped, end: clamped + 60, taskPreferences: {} };
+    if (!isOverlapping(slot, key)) addNewSlot(slot as Slot, activeDate);
   } else {
-    const topY    = parseFloat(selectionEl!.style.top) - 6;
-    const height  = parseFloat(selectionEl!.style.height) + 6;
-    let startMin  = Math.floor(topY   / hourHeight * 60 / 15) * 15;
-    let duration  = Math.ceil(height  / hourHeight * 60 / 15) * 15;
-    if (duration < 15) duration = 60;
-    startMin = clamp(startMin, 0, 24 * 60 - 1);
-    const endMin  = clamp(startMin + duration, startMin + 15, 24 * 60);
+    // Glisser → créneau de la durée sélectionnée
+    const curMin   = yToMinutes(clientY, activeLayer);
+    const startMin = Math.min(dragStartMin, curMin);
+    const endMin   = Math.max(dragStartMin + 15, Math.max(dragStartMin, curMin));
     const slot = { start: startMin, end: endMin, taskPreferences: {} };
-
-    if (!isOverlapping(slot)) {
-      const targetLayer = (e.target instanceof Element ? e.target.closest('.slot-layer') : null) as HTMLElement | null;
-      const slotDate = targetLayer ? getDateForLayer(targetLayer) : new Date(viewDate);
-      addNewSlot(slot as Slot, slotDate)
-    }
+    if (!isOverlapping(slot, key)) addNewSlot(slot as Slot, activeDate);
   }
 
-  selectionEl?.remove(); selectionEl = null;
+  selectionEl?.remove(); selectionEl = null; activeLayer = null;
 }
 
-// ─── Attach grid listeners ─────────────────────────────────────────────────
+// ─── Attach listeners sur le grid entier ──────────────────────────────────
 
-grid.addEventListener('mousedown', startDrag as EventListener);
-grid.addEventListener('touchstart', startDrag as EventListener, { passive: false });
+gridEl.addEventListener('mousedown',  startDrag as EventListener);
+gridEl.addEventListener('touchstart', startDrag as EventListener, { passive: false });

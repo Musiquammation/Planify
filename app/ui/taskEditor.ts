@@ -34,25 +34,25 @@ const toggleDoneBtn   = document.getElementById('toggleDoneBtn')!;
 let taskDoneStatus = false;
 let taskDoneAt: number | null = null;
 
+let _pendingAfterConstraints: TaskAfterConstraint[] = [];
+
 // ─── After constraints UI ──────────────────────────────────────────────────
 
 function renderAfterConstraints(): void {
   const container = document.getElementById('afterConstraintsContainer')!;
-  const currentTask = editingTaskIndex >= 0 ? tasks[editingTaskIndex] : null;
-  const constraints = currentTask?.afterConstraints ?? [];
 
   // Tâches référençables : toutes sauf la tâche en cours d'édition
   const referenceable = tasks.filter((_, i) => i !== editingTaskIndex);
 
   if (referenceable.length === 0) {
-    container.innerHTML = '<p style="font-size:12px;color:var(--muted);">Aucune autre tâche disponible.</p>';
+    container.innerHTML = '<p style="font-size:12px;color:var(--muted);margin:0;">Aucune autre tâche disponible.</p>';
     return;
   }
 
+  const constraints = _pendingAfterConstraints;
   let html = '';
 
   constraints.forEach((constraint, idx) => {
-    const refTask = tasks.find(t => t.id === constraint.taskId);
     const days  = Math.floor(constraint.delayMinutes / (60 * 24));
     const hours = Math.floor((constraint.delayMinutes % (60 * 24)) / 60);
     const mins  = constraint.delayMinutes % 60;
@@ -82,13 +82,11 @@ function renderAfterConstraints(): void {
   html += `<button class="btn-secondary" id="addAfterConstraintBtn" style="width:100%;margin-top:4px;">+ Ajouter une dépendance</button>`;
   container.innerHTML = html;
 
-  // Events
+  // Events — lire/écrire dans _pendingAfterConstraints
   container.querySelectorAll<HTMLSelectElement>('.after-task-select').forEach(sel => {
     sel.addEventListener('change', () => {
       const idx = parseInt(sel.dataset.idx!);
-      if (editingTaskIndex >= 0 && tasks[editingTaskIndex].afterConstraints) {
-        tasks[editingTaskIndex].afterConstraints![idx].taskId = sel.value;
-      }
+      _pendingAfterConstraints[idx].taskId = sel.value;
     });
   });
 
@@ -99,32 +97,22 @@ function renderAfterConstraints(): void {
       const d = parseInt(row.querySelector<HTMLInputElement>('.after-delay-days')!.value) || 0;
       const h = parseInt(row.querySelector<HTMLInputElement>('.after-delay-hours')!.value) || 0;
       const m = parseInt(row.querySelector<HTMLInputElement>('.after-delay-mins')!.value) || 0;
-      const total = d * 24 * 60 + h * 60 + m;
-      if (editingTaskIndex >= 0 && tasks[editingTaskIndex].afterConstraints) {
-        tasks[editingTaskIndex].afterConstraints![idx].delayMinutes = total;
-      }
+      _pendingAfterConstraints[idx].delayMinutes = d * 24 * 60 + h * 60 + m;
     });
   });
 
   container.querySelectorAll<HTMLButtonElement>('.after-constraint-delete').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.idx!);
-      if (editingTaskIndex >= 0) {
-        tasks[editingTaskIndex].afterConstraints!.splice(idx, 1);
-        if (tasks[editingTaskIndex].afterConstraints!.length === 0) {
-          delete tasks[editingTaskIndex].afterConstraints;
-        }
-        renderAfterConstraints();
-      }
+      _pendingAfterConstraints.splice(idx, 1);
+      renderAfterConstraints();
     });
   });
 
   document.getElementById('addAfterConstraintBtn')?.addEventListener('click', () => {
-    if (editingTaskIndex < 0) return;
     const ref = referenceable[0];
     if (!ref) return;
-    if (!tasks[editingTaskIndex].afterConstraints) tasks[editingTaskIndex].afterConstraints = [];
-    tasks[editingTaskIndex].afterConstraints!.push({ taskId: ref.id, delayMinutes: 0 });
+    _pendingAfterConstraints.push({ taskId: ref.id, delayMinutes: 0 });
     renderAfterConstraints();
   });
 }
@@ -149,7 +137,9 @@ export function openTaskEditor(taskIndex = -1): void {
 
   if (taskIndex >= 0) {
     const task = tasks[taskIndex];
-    taskEditorTitle.textContent = 'Modifier la tâche';
+    _pendingAfterConstraints = task.afterConstraints ? [...task.afterConstraints] : [];
+
+    taskEditorTitle.textContent = 'Edit task';
     taskNameInput.value  = task.name;
     taskDuration.value   = String(task.duration);
     taskTypeSelect.value = task.type;
@@ -185,6 +175,7 @@ export function openTaskEditor(taskIndex = -1): void {
       toggleDoneBtn.classList.replace('btn-primary', 'btn-secondary');
     }
   } else {
+    _pendingAfterConstraints = [];
     taskEditorTitle.textContent  = 'Nouvelle tâche';
     taskNameInput.value  = '';
     taskDuration.value   = '60';
@@ -206,6 +197,7 @@ export function openTaskEditor(taskIndex = -1): void {
 export function closeTaskEditorFunc(): void {
   taskEditor.classList.remove('open');
   setEditingTaskIndex(-1);
+  _pendingAfterConstraints = [];
   setTimeout(() => openTaskPanel(), 100);
 }
 
@@ -242,7 +234,7 @@ export function saveTask(): void {
   const id = editingTaskIndex >= 0 ? (tasks[editingTaskIndex].id || generateTaskId()) : generateTaskId();
 
   // Conserver les afterConstraints éditées en live sur l'objet tasks[i]
-  const afterConstraints = editingTaskIndex >= 0 ? tasks[editingTaskIndex].afterConstraints : undefined;
+  const afterConstraints = _pendingAfterConstraints.length > 0 ? [..._pendingAfterConstraints] : undefined;
 
   const task: Task = { id, name, duration, type, bornline, deadline, done: taskDoneStatus, doneAt: taskDoneAt };
   if (afterConstraints && afterConstraints.length > 0) task.afterConstraints = afterConstraints;
