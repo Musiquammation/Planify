@@ -134,7 +134,6 @@ function _endSlotDrag(e: MouseEvent | TouchEvent): void {
   const newEnd = newStart + duration;
 
   // draggedSlotDate est la date de la colonne du slot déplacé
-  console.log(draggedSlotDate);
   const key = isoDateKey(draggedSlotDate);
   const daySlots = store[key] ?? [];
   const hasOverlap = daySlots.some(
