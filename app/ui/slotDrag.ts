@@ -121,7 +121,7 @@ function _onSlotDrag(e: MouseEvent | TouchEvent): void {
 }
 
 function _endSlotDrag(e: MouseEvent | TouchEvent): void {
-  if (!isDraggingSlot || !draggedSlot || !draggedSlotElement || !draggedSlotDate) return;
+  if (!draggedSlot || !draggedSlotElement || !draggedSlotDate) return;
   isDraggingSlot = false;
 
   const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
@@ -133,7 +133,8 @@ function _endSlotDrag(e: MouseEvent | TouchEvent): void {
     Math.floor(relativeY / hourHeight * 60 / 15) * 15));
   const newEnd = newStart + duration;
 
-  // Vérifier l'overlap uniquement sur le jour du slot déplacé
+  // draggedSlotDate est la date de la colonne du slot déplacé
+  console.log(draggedSlotDate);
   const key = isoDateKey(draggedSlotDate);
   const daySlots = store[key] ?? [];
   const hasOverlap = daySlots.some(

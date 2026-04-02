@@ -152,8 +152,8 @@ function _appendSlotEl(layer: HTMLElement, slot: Slot, date: Date): void {
   const titleText = (slot.name ?? 'Slot') + (slot.done ? ' ✓' : '');
   el.innerHTML = `<div class="title">${titleText}</div><div class="time">${minutesToTime(slot.start)} — ${minutesToTime(slot.end)}</div>`;
 
-  el.addEventListener('mousedown', e => startSlotDrag(e as MouseEvent, slot, el));
-  el.addEventListener('touchstart', e => startSlotDrag(e as TouchEvent, slot, el), { passive: false });
+  el.addEventListener('mousedown', e => startSlotDrag(e as MouseEvent, slot, el, date));
+  el.addEventListener('touchstart', e => startSlotDrag(e as TouchEvent, slot, el, date), { passive: false });
 
   layer.appendChild(el);
 }
