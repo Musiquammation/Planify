@@ -55,6 +55,8 @@ async function placeTasks(): Promise<void> {
 
   try {
     const newCompletions = await runAlgoInWorker(store, tasks, taskTypes);
+
+
     clearInterval(timer);
 
     assignTasksToSlots(newCompletions);

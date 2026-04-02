@@ -1,20 +1,48 @@
 import type { SlotStore, TaskType, ExpandedTask } from '../types/models.js';
-import { buildBuffer, buildBufferArgs } from '../algo/buildBuffer.js';
+import { buildBuffer, buildBufferArgs } from '../buildBuffer.js';
 
 import {Module} from "./algo_module.js"
 
-
 const modulePromise = Module();
+
+let interruptPtr: any = null;
+
+async function getInterruptor() {
+	const module = (await modulePromise) as any;
+
+	if (interruptPtr)
+		return interruptPtr;
+
+	interruptPtr = module._malloc(4);
+	module.setValue(interruptPtr, 0, 'i32');
+	module._apiSetInterruptPtr(interruptPtr);
+	return interruptPtr;
+}
 
 self.onmessage = async (e) => {
 	const { id, action } = e.data;
+	console.log(action);
 	const module = (await modulePromise) as any;
 
 
 	switch (action) {
+	case 'getInterruptor':
+	{
+		const i = await getInterruptor();
+		self.postMessage({
+			id: e.data.id,
+			action: 'getInterruptor',
+			buffer: module.HEAP32.buffer,
+			interruptPtr: i
+		});
+		break;
+	}
+
 	case 'runAlgo':
 	{
 		const {inputBuffer, tasks, slots} = e.data;
+		const i = await getInterruptor();
+		module.setValue(i, 0, 'i32');
 
 		// Allocate WASM memory and call the algorithm
 		const inputPtr = module._malloc(inputBuffer.byteLength);
@@ -33,5 +61,8 @@ self.onmessage = async (e) => {
 		self.postMessage({ id, completions, action: 'runAlgo' });
 		break;
 	}
+
+	default:
+		throw new Error("Invalid action: " + action);
 	}
 };

@@ -1,5 +1,5 @@
-import { Task, Slot, TaskType, SlotStore, ExpandedTask } from '../types/models.js';
-import { toDayNumber } from '../utils/date.js';
+import { Task, Slot, TaskType, SlotStore, ExpandedTask } from './types/models.js';
+import { toDayNumber } from './utils/date.js';
 
 export interface NormalizedSlot {
   start: number;
